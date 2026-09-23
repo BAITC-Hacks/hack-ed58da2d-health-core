@@ -32,6 +32,8 @@ python3 -m venv /opt/healthcore/api/.venv
 
 Создайте проект в Supabase. В **Connect → Connection string** выберите Direct connection при наличии IPv6 или **Session pooler, порт 5432** для IPv4. URL вида `postgresql+psycopg://USER:URL_ENCODED_PASSWORD@HOST:5432/postgres?sslmode=require` поместите только в `/opt/healthcore/api/.env`. Пароль URL-кодируется. API key Supabase не нужен. Команда `init-db` создаёт таблицы внутри **существующей** БД; облачный проект она не создаёт. Таблицы `public` получают RLS без политик `anon`/`authenticated`: браузер работает только через backend.
 
+Session Pooler имеет ограничение числа постоянных соединений. По умолчанию API использует пул из двух соединений без дополнительных (`DB_POOL_SIZE=2`, `DB_MAX_OVERFLOW=0`). Учитывайте также локальный API, CLI и другие сервисы, подключённые к тому же проекту.
+
 ### B. Собственный PostgreSQL 17
 
 Официальный [PostgreSQL Apt Repository](https://www.postgresql.org/download/linux/debian/) поддерживает Debian 12. Установите пакет 17 и создайте отдельную роль:
