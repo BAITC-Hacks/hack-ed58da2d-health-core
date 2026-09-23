@@ -15,7 +15,8 @@ engine = create_engine(
     database_url,
     connect_args={"check_same_thread": False} if database_url.startswith("sqlite") else {},
     **({"pool_pre_ping": True, "pool_size": int(os.getenv("DB_POOL_SIZE", "2")),
-        "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "0")), "pool_recycle": 300}
+        "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "0")), "pool_recycle": 300,
+        "pool_timeout": 10}
        if database_url.startswith("postgresql") else {}),
 )
 SessionLocal = sessionmaker(bind=engine)

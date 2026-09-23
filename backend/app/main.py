@@ -1,4 +1,5 @@
 from datetime import date, datetime, time
+import logging
 import os
 import secrets
 
@@ -6,6 +7,7 @@ from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, Upload
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .bootstrap import bootstrap
@@ -14,6 +16,7 @@ from .pipeline import create_forecast, import_csv_stream, train_model
 from .turbines import coordinates_from_maps_url
 
 app = FastAPI(title="Health Core Wind Forecast", version="0.1.0")
+logger = logging.getLogger(__name__)
 app.add_middleware(CORSMiddleware, allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
                    allow_methods=["GET", "POST"], allow_headers=["Content-Type", "X-Admin-Key"])
 
@@ -78,7 +81,13 @@ def health(session: Session = Depends(get_session)) -> dict:
 
 @app.get("/readiness")
 def readiness(session: Session = Depends(get_session)) -> dict:
-    return bootstrap.snapshot(session)
+    try:
+        return bootstrap.snapshot(session)
+    except SQLAlchemyError:
+        logger.exception("Readiness database check failed")
+        return {"status": "unavailable", "can_forecast": False,
+                "message": "Нет соединения с БД. Проверьте DATABASE_URL и доступность PostgreSQL.",
+                "model_revision_id": None, "model_version": None, "supported_turbine_ids": []}
 
 
 @app.get("/turbines")

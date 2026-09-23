@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from backend.app.db import init_db
@@ -60,6 +61,11 @@ class ApiTests(unittest.TestCase):
         readiness = self.client.get('/readiness')
         self.assertEqual(readiness.status_code, 200)
         self.assertFalse(readiness.json()['can_forecast'])
+        with patch("backend.app.main.bootstrap.snapshot", side_effect=SQLAlchemyError("connection failed")), \
+                patch("backend.app.main.logger.exception"):
+            unavailable = self.client.get('/readiness').json()
+        self.assertEqual(unavailable["status"], "unavailable")
+        self.assertIn("БД", unavailable["message"])
         with patch.dict("os.environ", {"API_WRITE_KEY": "test-operator-secret"}):
             self.assertEqual(self.client.get("/turbines").status_code, 200)
             body = {"name": "Турбина 03", "latitude": 43.7, "longitude": 78.6}

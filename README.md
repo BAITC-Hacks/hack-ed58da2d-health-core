@@ -149,7 +149,7 @@ Backend зависимости с точными версиями зафикси
 
 ## Развёртывание с нуля на Windows
 
-Требуются Git, Python 3.11+ (`python --version`), Node.js 22+ и npm (`node --version`, `npm --version`), доступ к Open-Meteo. Команды выполнять в PowerShell из корня проекта. PostgreSQL в Supabase нужен для общей БД команды; локальную проверку можно провести с SQLite. Если репозитория ещё нет: `git clone https://github.com/BAITC-Hacks/hack-ed58da2d-health-core.git`, `cd hack-ed58da2d-health-core`, `git switch dev`.
+Требуются Git, Python 3.11+ (`python --version`), Node.js 22+ и npm (`node --version`, `npm --version`), доступ к Open-Meteo. Команды выполнять в PowerShell из корня проекта. Для рабочей установки задайте PostgreSQL в Supabase либо собственный PostgreSQL; SQLite допустима только для локальной проверки. Если репозитория ещё нет: `git clone https://github.com/BAITC-Hacks/hack-ed58da2d-health-core.git`, `cd hack-ed58da2d-health-core`, `git switch dev`.
 
 ```powershell
 python -m venv .venv
@@ -233,7 +233,7 @@ Copy-Item .\healthcore.sqlite3 .\healthcore-before-supabase.sqlite3
 - `POST /measurements` — добавить одно измерение с `turbine_id`, `source_id`, `observed_at`, `wind_speed_ms`, `normalized_power`, `temperature_c`.
 - `POST /measurements/upload?turbine_id=1` — загрузить CSV multipart-полем `file`, максимум 50 МБ; ответ `{rows, imported, skipped}`.
 - `POST /models/train` — создать ревизию по данным БД до 31 января 2026 года (по умолчанию); тело `{"cutoff_date":"2026-02-01"}` разрешает использовать весь январь для выпусков не раньше 1 февраля. `GET /models` — список ревизий и метрик.
-- `GET /readiness` — готовность прогнозирования, стадия фонового импорта/обучения, причина недоступности и активная ревизия. Не требует ключа оператора.
+- `GET /readiness` — готовность прогнозирования, стадия фонового импорта/обучения, причина недоступности (в том числе БД) и активная ревизия. Не требует ключа оператора.
 - `POST /forecasts/2026-01-31` с JSON `{"turbine_ids":[1,2],"revision_id":1}` — рассчитать 48 часов для указанных турбин выбранной ревизией. Без `revision_id` используется последняя ревизия, совместимая с датой выпуска.
 - `GET /forecasts/{id}` — результат, погодные признаки и анализ.
 - `GET /forecasts` — до 100 последних сохранённых расчётов для истории интерфейса.
