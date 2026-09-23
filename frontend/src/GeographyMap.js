@@ -44,6 +44,7 @@ export default {
     const turbines = ref([])
     const loading = ref(true)
     const error = ref('')
+    const mapLayer = ref('Рельеф')
     const windDate = ref(props.initialDate)
     const windHour = ref(1)
     const windEnabled = ref(true)
@@ -146,7 +147,7 @@ export default {
     async function focusTurbine(turbine) {
       if (!map) return
       map.panTo({ lat: turbine.latitude, lng: turbine.longitude })
-      map.setZoom(17)
+      map.setZoom(map.getMapTypeId?.() === 'terrain' ? 14 : 17)
       const marker = markers.find(item => item.turbine.id === turbine.id)
       if (marker) {
         infoWindow.setContent(marker.info)
@@ -176,9 +177,10 @@ export default {
         }
         map = new Map(mapElement.value, {
           center,
-          zoom: 16,
+          zoom: 14,
           mapId: demoMapId,
           mapTypeId: maps.MapTypeId.TERRAIN,
+          maxZoom: 14,
           mapTypeControl: true,
           mapTypeControlOptions: { mapTypeIds: [maps.MapTypeId.TERRAIN, maps.MapTypeId.ROADMAP, maps.MapTypeId.SATELLITE] },
           streetViewControl: false,
@@ -228,6 +230,12 @@ export default {
         if (typeof map.addListener === 'function') {
           mapListeners.push(map.addListener('zoom_changed', renderWind))
           mapListeners.push(map.addListener('heading_changed', renderWind))
+          mapListeners.push(map.addListener('maptypeid_changed', () => {
+            const type = map.getMapTypeId()
+            mapLayer.value = { terrain: 'Рельеф', roadmap: 'Карта', satellite: 'Спутник' }[type] || 'Карта'
+            map.setOptions({ maxZoom: type === maps.MapTypeId.TERRAIN ? 14 : 20 })
+            if (type === maps.MapTypeId.TERRAIN && map.getZoom() > 14) map.setZoom(14)
+          }))
         }
         void loadWind()
       } catch (reason) {
@@ -248,7 +256,7 @@ export default {
     })
 
     return {
-      mapElement, turbines, loading, error, focusTurbine,
+      mapElement, turbines, loading, error, mapLayer, focusTurbine,
       windDate, windHour, windEnabled, windLoading, windError, windPlaying,
       windReady, selectedTime, runTime, windAt, speedText, compassFrom,
       loadWind, toggleWind, togglePlayback
@@ -258,7 +266,7 @@ export default {
     <section class="geo-page">
       <div class="geo-intro">
         <div><p class="eyebrow">РАСПОЛОЖЕНИЕ ОБЪЕКТОВ</p><h2>География ВЭС</h2><p>Турбины и почасовой ветер на карте Google Maps.</p></div>
-        <span class="geo-provider">Google Maps · Рельеф</span>
+        <span class="geo-provider">Google Maps · {{mapLayer}}</span>
       </div>
       <div v-if="error" class="notice error" role="alert">{{error}}</div>
       <div v-else-if="loading" class="notice" role="status"><span class="spinner"></span> Загружаем координаты и карту…</div>
@@ -280,7 +288,7 @@ export default {
         <div ref="mapElement" class="geo-map" role="region" aria-label="Карта расположения турбин"><span v-if="!loading && error">Карта недоступна. Координаты и ссылки на объекты — справа.</span></div>
         <aside class="geo-list panel">
           <h3>Турбины</h3>
-          <p class="geo-hint">Выберите объект, чтобы приблизить карту и открыть данные.</p>
+          <p class="geo-hint">Выберите объект, чтобы показать его на карте и открыть данные.</p>
           <button v-for="turbine in turbines" :key="turbine.id" class="geo-turbine" @click="focusTurbine(turbine)">
             <span class="geo-pin">{{turbine.id}}</span><span class="geo-turbine-copy"><strong>{{turbine.name}}</strong><small>{{turbine.latitude.toFixed(6)}}, {{turbine.longitude.toFixed(6)}}</small><small v-if="windEnabled && windAt(turbine)" class="geo-turbine-wind">{{speedText(windAt(turbine).speed)}} м/с · из {{compassFrom(windAt(turbine).fromDegrees)}} ({{Math.round(windAt(turbine).fromDegrees)}}°)</small></span><span aria-hidden="true">↗</span>
           </button>
