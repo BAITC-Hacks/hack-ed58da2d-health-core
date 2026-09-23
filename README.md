@@ -147,7 +147,7 @@ Backend зависимости с точными версиями зафикси
 
 ## Развёртывание с нуля на Windows
 
-Требуются Git, Python 3.11+ (`python --version`), Node.js 20+ и npm (`node --version`, `npm --version`), доступ к Open-Meteo. Команды выполнять в PowerShell из корня проекта. PostgreSQL в Supabase нужен для общей БД команды; локальную проверку можно провести с SQLite. Если репозитория ещё нет: `git clone https://github.com/BAITC-Hacks/hack-ed58da2d-health-core.git`, `cd hack-ed58da2d-health-core`, `git switch dev`.
+Требуются Git, Python 3.11+ (`python --version`), Node.js 22+ и npm (`node --version`, `npm --version`), доступ к Open-Meteo. Команды выполнять в PowerShell из корня проекта. PostgreSQL в Supabase нужен для общей БД команды; локальную проверку можно провести с SQLite. Если репозитория ещё нет: `git clone https://github.com/BAITC-Hacks/hack-ed58da2d-health-core.git`, `cd hack-ed58da2d-health-core`, `git switch dev`.
 
 ```powershell
 python -m venv .venv
@@ -231,6 +231,7 @@ Copy-Item .\healthcore.sqlite3 .\healthcore-before-supabase.sqlite3
 - `POST /models/train` — создать ревизию по данным БД до 31 января 2026 года (по умолчанию); тело `{"cutoff_date":"2026-02-01"}` разрешает использовать весь январь для выпусков не раньше 1 февраля. `GET /models` — список ревизий и метрик.
 - `POST /forecasts/2026-01-31` с JSON `{"turbine_ids":[1,2],"revision_id":1}` — рассчитать 48 часов для указанных турбин выбранной ревизией. Без тела используются турбины, известные последней модели, и последняя ревизия.
 - `GET /forecasts/{id}` — результат, погодные признаки и анализ.
+- `GET /forecasts` — до 100 последних сохранённых расчётов для истории интерфейса.
 
 Ревизия модели содержит метаданные и бинарный артефакт в PostgreSQL; локальный файл в `MODEL_DIR` — кэш и резервная копия. Другой ПК с доступом к той же БД может выбрать ревизию без копирования файлов. Модель не предсказывает для турбины без обучающих строк; сначала импортируйте её CSV и переобучите модель. При заданном `API_WRITE_KEY` все операции `POST` требуют заголовок `X-Admin-Key`; в интерфейсе ключ вводится в верхней панели и хранится только в памяти вкладки (`sessionStorage`). Не помещайте его в `VITE_`-переменные или Git.
 

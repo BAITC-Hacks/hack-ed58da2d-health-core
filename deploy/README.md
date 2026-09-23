@@ -11,6 +11,7 @@ curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
 bash /tmp/nodesource_setup.sh
 apt install -y nodejs
 python3 --version; node --version; npm --version
+install -d /opt/healthcore
 git clone --branch dev https://github.com/BAITC-Hacks/hack-ed58da2d-health-core.git /opt/healthcore/src
 id healthcore || useradd --system --home /opt/healthcore/api --shell /usr/sbin/nologin healthcore
 install -d -o healthcore -g healthcore /opt/healthcore/api /opt/healthcore/api/data /opt/healthcore/api/models

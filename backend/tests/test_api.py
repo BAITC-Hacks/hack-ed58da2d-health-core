@@ -54,6 +54,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.client.post("/models/train", json={"cutoff_date": "2026-02-02"}).status_code, 422)
 
     def test_operator_key_protects_writes_without_blocking_reads(self):
+        self.assertEqual(self.client.get('/forecasts').json(), [])
         with patch.dict("os.environ", {"API_WRITE_KEY": "test-operator-secret"}):
             self.assertEqual(self.client.get("/turbines").status_code, 200)
             body = {"name": "Турбина 03", "latitude": 43.7, "longitude": 78.6}

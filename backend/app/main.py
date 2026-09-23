@@ -171,6 +171,15 @@ def forecast(issue_date: date, options: ForecastInput | None = None,
     return {"id": run.id, "status": run.status, "analysis": run.analysis}
 
 
+@app.get("/forecasts")
+def list_forecasts(session: Session = Depends(get_session)) -> list[dict]:
+    runs = session.scalars(select(ForecastRun).order_by(ForecastRun.issued_at.desc(),
+                                                       ForecastRun.id.desc()).limit(100)).all()
+    return [{"id": run.id, "issued_at": run.issued_at, "status": run.status,
+             "model_version": run.model_version, "point_count": len(run.points),
+             "turbine_ids": run.analysis.get("turbine_ids", [])} for run in runs]
+
+
 @app.get("/forecasts/{run_id}")
 def get_forecast(run_id: int, session: Session = Depends(get_session)) -> dict:
     run = session.get(ForecastRun, run_id)

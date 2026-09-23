@@ -21,7 +21,7 @@ const assert = require('node:assert/strict')
    if(requireKey&&route.request().method()==='POST')assert.equal(route.request().headers()['x-admin-key'],'TEST-OPERATOR-KEY')
    const newTurbine=path==='/turbines'&&route.request().method()==='POST'?{id:3,...route.request().postDataJSON()}:null
    if(newTurbine)turbines.push(newTurbine)
-   const payload=path==='/health'?{status:'ok'}:newTurbine||path==='/turbines'?newTurbine||turbines:path==='/models'?models:path.startsWith('/measurements/upload')?{rows:1,imported:1,skipped:0}:path==='/models/train'?{revision_id:1,model_version:'TEST-FIXTURE',validation_mae:.03,warning:''}:route.request().method()==='POST'?{id:7}:run
+   const payload=path==='/health'?{status:'ok'}:newTurbine||path==='/turbines'?newTurbine||turbines:path==='/models'?models:path==='/forecasts'?[{id:7,issued_at:run.issued_at,status:'complete',point_count:96}]:path.startsWith('/measurements/upload')?{rows:1,imported:1,skipped:0}:path==='/models/train'?{revision_id:1,model_version:'TEST-FIXTURE',validation_mae:.03,warning:''}:route.request().method()==='POST'?{id:7}:run
    route.fulfill({status:fail&&path.startsWith('/forecasts/')&&route.request().method()==='POST'?409:200,contentType:'application/json',body:JSON.stringify(fail&&path.startsWith('/forecasts/')&&route.request().method()==='POST'?{detail:'Train the model first'}:payload)})
  })
  await page.goto('http://127.0.0.1:5173')
@@ -73,6 +73,8 @@ const assert = require('node:assert/strict')
  await page.getByRole('button',{name:'Источники данных',exact:true}).click()
  await page.getByText('TEST-FIXTURE',{exact:true}).waitFor()
  await page.getByRole('button',{name:'История расчётов',exact:true}).click()
+ await page.getByText('1 в БД',{exact:true}).waitFor()
+ await page.getByRole('button',{name:/#7 .*96 точек/}).waitFor()
  await page.getByLabel('Открыть сохранённый прогноз по ID').fill('7')
  await page.getByRole('button',{name:'Открыть',exact:true}).click()
  await page.locator('tbody tr').nth(47).waitFor()
