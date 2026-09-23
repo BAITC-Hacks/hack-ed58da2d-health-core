@@ -1,0 +1,15 @@
+TZ/
+tz/
+docs/
+HACKATHON_TZ.md
+.env
+.venv/
+.idea/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.sqlite3
+*.joblib
+.coverage
+dist/
+node_modules/
