@@ -14,7 +14,7 @@ python3 --version; node --version; npm --version
 install -d /opt/healthcore
 git clone --branch dev https://github.com/BAITC-Hacks/hack-ed58da2d-health-core.git /opt/healthcore/src
 id healthcore || useradd --system --home /opt/healthcore/api --shell /usr/sbin/nologin healthcore
-install -d -o healthcore -g healthcore /opt/healthcore/api /opt/healthcore/api/data /opt/healthcore/api/models
+install -d -o healthcore -g healthcore /opt/healthcore/api /opt/healthcore/api/data /opt/healthcore/api/models /opt/healthcore/api/TZ
 install -d /opt/healthcore/ui
 cp -a /opt/healthcore/src/backend /opt/healthcore/api/
 cp /opt/healthcore/src/requirements.txt /opt/healthcore/api/
@@ -24,7 +24,7 @@ python3 -m venv /opt/healthcore/api/.venv
 /opt/healthcore/api/.venv/bin/python -m pip install -r /opt/healthcore/api/requirements.txt
 ```
 
-Если репозиторий закрыт, получите доступ от организатора или перенесите архив **того же коммита** из выданного репозитория в `/opt/healthcore/src`. Конкурсные CSV в Git не входят. Для проверки установки без них доступен генератор синтетических CSV в шаге 3.
+Если репозиторий закрыт, получите доступ от организатора или перенесите архив **того же коммита** из выданного репозитория в `/opt/healthcore/src`. Конкурсные CSV в Git не входят. Для автоматического обучения оба файла нужно передать отдельно в `/opt/healthcore/api/TZ`; для проверки установки без них доступен генератор синтетических CSV в шаге 3.
 
 ## 2. Выбор базы данных
 
@@ -61,7 +61,7 @@ chown healthcore:healthcore /opt/healthcore/api/.env
 python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
 ```
 
-Отредактируйте `.env`: задайте `DATABASE_URL` выбранного варианта и вставьте случайный результат последней команды в `API_WRITE_KEY`. Ключ нужен для `POST` (турбины, CSV, обучение, расчёт); вводится в верхней панели сайта и хранится только в текущей вкладке. **Не** помещайте его в `VITE_*`, Git или публичный URL. Если заданы и `SUPABASE_DATABASE_URL`, и `DATABASE_URL`, первая имеет приоритет; при выборе собственного PostgreSQL удалите `SUPABASE_DATABASE_URL`. `MODEL_DIR=/opt/healthcore/api/models`, `DB_INIT_ON_STARTUP=false` после явного `init-db`. Для локального теста `API_WRITE_KEY` можно оставить пустым, но не для публичного сайта.
+Отредактируйте `.env`: задайте `DATABASE_URL` выбранного варианта и вставьте случайный результат последней команды в `API_WRITE_KEY`. Ключ нужен для `POST` (турбины, CSV, обучение, расчёт); вводится в верхней панели сайта и хранится только в текущей вкладке. **Не** помещайте его в `VITE_*`, Git или публичный URL. Если заданы и `SUPABASE_DATABASE_URL`, и `DATABASE_URL`, первая имеет приоритет; при выборе собственного PostgreSQL удалите `SUPABASE_DATABASE_URL`. `MODEL_DIR=/opt/healthcore/api/models`, `DB_INIT_ON_STARTUP=false` после явного `init-db`, `AUTO_BOOTSTRAP=true`, `TZ_DIR=/opt/healthcore/api/TZ`. Для локального теста `API_WRITE_KEY` можно оставить пустым, но не для публичного сайта.
 
 ## 3. Схема, данные и модель
 
@@ -70,7 +70,17 @@ runuser -u healthcore -- sh -c 'cd /opt/healthcore/api && .venv/bin/python -m ba
 runuser -u healthcore -- sh -c 'cd /opt/healthcore/api && .venv/bin/python -m unittest discover -s backend/tests -v'
 ```
 
-`init-db` повторяемо создаёт шесть таблиц, индексы, ограничения и две турбины; **не** меняет столбцы уже существующих таблиц. Для автономного smoke test с явно синтетическими данными:
+`init-db` повторяемо создаёт шесть таблиц, индексы, ограничения и две турбины; **не** меняет столбцы уже существующих таблиц.
+
+Для конкурсного первого запуска скопируйте оба исходных CSV из локальной `TZ/` в `/opt/healthcore/api/TZ` **до** запуска сервиса. Например, на Windows с PuTTY из корня локального проекта:
+
+```powershell
+& 'C:\Program Files\PuTTY\pscp.exe' -i 'C:\path\to\key.ppk' '.\TZ\*.csv' root@healthcore.ych.kz:/opt/healthcore/api/TZ/
+```
+
+На сервере установите права чтения для сервисного пользователя: `chown healthcore:healthcore /opt/healthcore/api/TZ/*.csv && chmod 640 /opt/healthcore/api/TZ/*.csv`. Имена должны заканчиваться на `turbine 1.csv` и `turbine 2.csv`. Сервис при первом старте сам проверит оба файла, импортирует исходные строки в PostgreSQL и обучит модель с отсечением 31.01.2026. Повторный старт при уже сохранённой ревизии не повторяет импорт и обучение. Если CSV отсутствуют или некорректны, API продолжит работать, но `/readiness` и интерфейс покажут причину; после исправления файлов перезапустите сервис.
+
+Для автономного smoke test с явно синтетическими данными:
 
 ```bash
 runuser -u healthcore -- sh -c 'cd /opt/healthcore/api && .venv/bin/python -m backend.generate_demo_csv data/demo'
@@ -79,7 +89,7 @@ runuser -u healthcore -- sh -c 'cd /opt/healthcore/api && .venv/bin/python -m ba
 runuser -u healthcore -- sh -c 'cd /opt/healthcore/api && .venv/bin/python -m backend.cli train'
 ```
 
-Для конкурсных результатов вместо этого импортируйте два предоставленных CSV для ID 1 и 2 и обучите ревизию с нужным отсечением. Если Supabase уже содержит измерения и модели, импорт/обучение не повторяйте. Метрики корневого README относятся **только** к конкурсным данным; синтетика — проверка запуска.
+Для конкурсных результатов ручной импорт и обучение не нужны: при наличии файлов в `TZ_DIR` их выполнит сервис. Если Supabase уже содержит измерения и модель, автоматический bootstrap пропустит импорт и обучение. Метрики корневого README относятся **только** к конкурсным данным; синтетика — проверка запуска.
 
 ## 4. API, frontend и HTTPS
 
@@ -88,6 +98,7 @@ cp /opt/healthcore/src/deploy/healthcore-api.service /etc/systemd/system/healthc
 systemctl daemon-reload
 systemctl enable --now healthcore-api
 curl -fsS http://127.0.0.1:8000/health
+curl -fsS http://127.0.0.1:8000/readiness
 cd /opt/healthcore/src/frontend
 npm ci
 VITE_API_URL=/api npm run build
@@ -100,7 +111,7 @@ certbot --nginx -d healthcore.ych.kz
 
 Если symlink уже существует, не создавайте его повторно. Перед заменой действующего сайта сохраните конфигурацию и файлы. Шаблон nginx содержит HTTP-блок; Certbot добавляет HTTPS и сертификат. Порт 8000 наружу не открывайте. Для другого домена замените `server_name` и аргумент Certbot.
 
-Проверка: `curl -fsS https://healthcore.ych.kz/api/health` возвращает `"status":"ok"` и `"database_backend":"postgresql"`; `curl -I https://healthcore.ych.kz/` — `200`. В браузере выберите турбину/ревизию и сохранённый прогноз; для новых операций введите ключ оператора. `POST /api/turbines` без ключа возвращает `401`. Без ключа Google Maps встроенная карта не загружается, но координаты и ссылки доступны в списке.
+Проверка: `curl -fsS https://healthcore.ych.kz/api/health` возвращает `"status":"ok"` и `"database_backend":"postgresql"`; `/api/readiness` после фоновой подготовки возвращает `"status":"ready"` и `"can_forecast":true`; `curl -I https://healthcore.ych.kz/` — `200`. Пока идут импорт и обучение, `/readiness` возвращает `importing`/`training`; сайт показывает тот же статус и блокирует новый прогноз. В браузере выберите турбину/ревизию и сохранённый прогноз; для новых операций введите ключ оператора. `POST /api/turbines` без ключа возвращает `401`. Без ключа Google Maps встроенная карта не загружается, но координаты и ссылки доступны в списке.
 
 ## 5. Обновление
 

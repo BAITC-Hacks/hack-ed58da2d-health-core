@@ -56,6 +56,9 @@ nav button small { margin-left: auto; font-size: 13px; }
 .workspace { flex: 1; min-width: 0; }
 .topbar { min-height: 60px; border-bottom: 1px solid var(--border); padding: 12px 28px; display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #ffffffb8; font-size: 14px; color: var(--muted); }
 .topbar b { margin: 0 10px; color: #8d9e93; }
+.forecast-state { padding: 7px 9px; border-radius: 6px; background: #fff3df; color: #80531a; font-size: 12px; white-space: nowrap; }
+.forecast-state.ready { background: #e5f3ea; color: #276744; }
+.forecast-state.unavailable { background: #fff0e9; color: #923f2d; }
 .operator-key { display:flex; align-items:center; gap:8px; margin-left:auto; font-size:12px; white-space:nowrap; }
 .operator-key input { width:150px; min-height:36px; padding:7px 9px; border:1px solid var(--border); border-radius:8px; font:inherit; }
 .status { background: transparent; color: #486451; font-size: 14px; min-height: 36px; white-space: nowrap; }
@@ -214,11 +217,12 @@ footer span:first-child { margin-right: auto; }
   .sidebar-collapsed nav { grid-template-columns: repeat(3,minmax(0,1fr)); }
   .sidebar-collapsed nav button { min-height: 56px; padding: 6px 2px; }
   .nav-text { font-size: 15px; }
-  .topbar { gap: 4px; }
-  .topbar > span { display: none; }
-  .topbar .status { margin-left: auto; }
-  .operator-key { margin-left:0; }
-  .operator-key input { width:120px; }
+  .topbar { gap: 8px; flex-wrap: wrap; }
+  .topbar > span:first-child { display: none; }
+  .forecast-state { order: 3; width: 100%; text-align: center; }
+  .topbar .status { order: 2; margin-left: auto; font-size: 12px; }
+  .operator-key { order: 1; margin-left:0; }
+  .operator-key input { width:110px; }
   .page-heading { margin-bottom: 18px; }
   .eyebrow { font-size: 11px; }
   h1 { font-size: 27px; }
