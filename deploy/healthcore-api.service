@@ -15,7 +15,7 @@ RestartSec=5
 NoNewPrivileges=true
 ProtectSystem=full
 ProtectHome=true
-ReadWritePaths=/opt/healthcore/api/data
+ReadWritePaths=/opt/healthcore/api/data /opt/healthcore/api/models
 
 [Install]
 WantedBy=multi-user.target

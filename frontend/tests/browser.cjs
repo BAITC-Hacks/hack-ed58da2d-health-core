@@ -10,6 +10,7 @@ const assert = require('node:assert/strict')
  const turbines=[{id:1,name:'Турбина 01',latitude:43.64515,longitude:78.535604},{id:2,name:'Турбина 02',latitude:43.643198,longitude:78.538828}]
  const models=[{id:1,version:'TEST-FIXTURE',validation_mae:.03,training_rows:1000,turbine_ids:[1,2]}]
  let fail=false
+ let requireKey=false
  await page.route('https://maps.googleapis.com/**',route=>{
    const callback=new URL(route.request().url()).searchParams.get('callback')
    assert.equal(callback,'__windSightMapsReady','Map loader waits for the Google Maps callback')
@@ -17,7 +18,10 @@ const assert = require('node:assert/strict')
  })
  await page.route('http://127.0.0.1:8000/**',route=>{
    const path=new URL(route.request().url()).pathname
-   const payload=path==='/health'?{status:'ok'}:path==='/turbines'?turbines:path==='/models'?models:path.startsWith('/measurements/upload')?{rows:1,imported:1,skipped:0}:path==='/models/train'?{revision_id:1,model_version:'TEST-FIXTURE',validation_mae:.03,warning:''}:route.request().method()==='POST'?{id:7}:run
+   if(requireKey&&route.request().method()==='POST')assert.equal(route.request().headers()['x-admin-key'],'TEST-OPERATOR-KEY')
+   const newTurbine=path==='/turbines'&&route.request().method()==='POST'?{id:3,...route.request().postDataJSON()}:null
+   if(newTurbine)turbines.push(newTurbine)
+   const payload=path==='/health'?{status:'ok'}:newTurbine||path==='/turbines'?newTurbine||turbines:path==='/models'?models:path.startsWith('/measurements/upload')?{rows:1,imported:1,skipped:0}:path==='/models/train'?{revision_id:1,model_version:'TEST-FIXTURE',validation_mae:.03,warning:''}:route.request().method()==='POST'?{id:7}:run
    route.fulfill({status:fail&&path.startsWith('/forecasts/')&&route.request().method()==='POST'?409:200,contentType:'application/json',body:JSON.stringify(fail&&path.startsWith('/forecasts/')&&route.request().method()==='POST'?{detail:'Train the model first'}:payload)})
  })
  await page.goto('http://127.0.0.1:5173')
@@ -86,6 +90,14 @@ const assert = require('node:assert/strict')
  await page.getByRole('button',{name:'Данные и модели',exact:true}).click()
  await page.getByText('Загрузка обучающих данных',{exact:true}).waitFor()
  await page.getByText('TEST-FIXTURE',{exact:true}).waitFor()
+ await page.getByRole('textbox',{name:'Ключ оператора для создания и расчёта'}).fill('TEST-OPERATOR-KEY')
+ requireKey=true
+ await page.getByRole('textbox',{name:'Название'}).fill('Турбина 03')
+ await page.getByRole('spinbutton',{name:'Широта'}).fill('43.7')
+ await page.getByRole('spinbutton',{name:'Долгота'}).fill('78.6')
+ await page.getByRole('button',{name:'Сохранить турбину'}).click()
+ await page.getByText(/Добавлена турбина Турбина 03/).waitFor()
+ assert.equal(await page.locator('.manage-card').last().getByText('Турбина 03',{exact:true}).count(),1)
  await page.locator('input[type=file]').setInputFiles({name:'train.csv',mimeType:'text/csv',buffer:Buffer.from('ID,Статистическое время,Средняя скорость ветра(m/s),Нормализованная активная мощность,Средняя температура окружающей среды(°C)\n1,2023-03-11 0:00:00,6.73,0.39,15.38\n')})
  await page.getByRole('button',{name:'Загрузить CSV',exact:true}).click()
  await page.getByText(/Проверено 1 строк/).waitFor()

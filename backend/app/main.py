@@ -19,6 +19,8 @@ app.add_middleware(CORSMiddleware, allow_origins=["http://127.0.0.1:5173", "http
 
 @app.on_event("startup")
 def startup() -> None:
+    if os.getenv("APP_ENV") == "production" and not os.getenv("API_WRITE_KEY"):
+        raise RuntimeError("API_WRITE_KEY is required in production")
     if os.getenv('DB_INIT_ON_STARTUP', 'true').lower() in ('1', 'true', 'yes'):
         init_db()
     else:
