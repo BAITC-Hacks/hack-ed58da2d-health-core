@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 import os
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
@@ -50,6 +50,10 @@ class TurbineInput(BaseModel):
 class ForecastInput(BaseModel):
     turbine_ids: list[int] = Field(min_length=1)
     revision_id: int | None = Field(default=None, ge=1)
+
+
+class TrainInput(BaseModel):
+    cutoff_date: date = date(2026, 1, 31)
 
 
 @app.get("/health")
@@ -133,9 +137,12 @@ def models(session: Session = Depends(get_session)) -> list[dict]:
 
 
 @app.post("/models/train", status_code=201)
-def train(session: Session = Depends(get_session)) -> dict:
+def train(options: TrainInput | None = None, session: Session = Depends(get_session)) -> dict:
+    cutoff_date = options.cutoff_date if options else date(2026, 1, 31)
+    if cutoff_date > date(2026, 2, 1):
+        raise HTTPException(status_code=422, detail="Training cutoff cannot enter the February test period")
     try:
-        return train_model(session)
+        return train_model(session, datetime.combine(cutoff_date, time.min))
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 

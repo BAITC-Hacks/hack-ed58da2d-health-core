@@ -1,7 +1,7 @@
 import io
 import tempfile
 import unittest
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -9,9 +9,9 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
 from backend.app.db import Measurement, ModelArtifact, ModelRevision, Turbine, init_db
-from backend.app.pipeline import SOURCE_COLUMNS, import_csv_stream, train_model
+from backend.app.pipeline import SOURCE_COLUMNS, create_forecast, import_csv_stream, train_model
 from backend.app.turbines import coordinates_from_maps_url
-from backend.app.weather import issue_and_weather_run
+from backend.app.weather import fetch_weather, issue_and_weather_run
 
 
 def csv_bytes(*rows):
@@ -63,12 +63,40 @@ class PipelineTests(unittest.TestCase):
         self.assertLess(first["training_max_at"], datetime(2026, 2, 1))
         self.assertEqual(self.session.scalar(select(func.count()).select_from(ModelRevision)), 2)
         self.assertEqual(self.session.scalar(select(func.count()).select_from(ModelArtifact)), 2)
+        for artifact in Path(self.temp.name).glob("*.joblib"):
+            artifact.unlink()
+        issued, _ = issue_and_weather_run(date(2026, 1, 31))
+        weather = {issued.astimezone(timezone.utc) + timedelta(hours=i): (8.0, 5.0)
+                   for i in range(1, 49)}
+        with patch("backend.app.pipeline.fetch_weather", return_value=weather):
+            run = create_forecast(self.session, date(2026, 1, 31), [1], second["revision_id"])
+        self.assertEqual(len(run.points), 48)
+        self.assertEqual({point.turbine_id for point in run.points}, {1})
+        self.assertEqual(run.model_version, second["model_version"])
+        with self.assertRaisesRegex(ValueError, "unavailable at forecast issue time"):
+            create_forecast(self.session, date(2026, 1, 10), [1], second["revision_id"])
 
     def test_weather_run_precedes_decision(self):
-        from datetime import date
         issued, weather_run = issue_and_weather_run(date(2026, 2, 1))
         self.assertLess(weather_run, issued)
         self.assertEqual(weather_run.strftime("%Y-%m-%d %H:%M"), "2026-01-31 12:00")
+
+    def test_archived_weather_uses_selected_coordinates_and_run(self):
+        data = {"hourly_units": {"wind_speed_100m": "m/s", "temperature_2m": "°C"},
+                "hourly": {"time": ["2026-02-01T00:00"], "wind_speed_100m": [7.5],
+                           "temperature_2m": [-2.0]}}
+        with patch("backend.app.weather.httpx.Client") as client:
+            response = client.return_value.__enter__.return_value.get.return_value
+            response.json.return_value = data
+            run_at = datetime(2026, 1, 31, 12, tzinfo=timezone.utc)
+            result = fetch_weather(43.645150, 78.535604, run_at)
+            url, kwargs = client.return_value.__enter__.return_value.get.call_args.args[0], client.return_value.__enter__.return_value.get.call_args.kwargs
+        self.assertIn("single-runs-api", url)
+        self.assertEqual(kwargs["params"]["run"], "2026-01-31T12:00")
+        self.assertEqual(kwargs["params"]["latitude"], 43.645150)
+        self.assertEqual(kwargs["params"]["longitude"], 78.535604)
+        self.assertEqual(kwargs["params"]["models"], "ecmwf_ifs")
+        self.assertEqual(result[datetime(2026, 2, 1, tzinfo=timezone.utc)], (7.5, -2.0))
 
     def test_google_maps_coordinates_and_restricted_hosts(self):
         with patch("backend.app.turbines.httpx.Client") as client:

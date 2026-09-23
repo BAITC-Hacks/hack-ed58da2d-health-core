@@ -26,8 +26,7 @@ SOURCE_COLUMNS = (
     "Нормализованная активная мощность",
     "Средняя температура окружающей среды(°C)",
 )
-TRAINING_CUTOFF = datetime(2026, 2, 1)
-MODEL_PATH = Path(os.getenv("MODEL_PATH", "./model.joblib"))
+TRAINING_CUTOFF = datetime(2026, 1, 31)
 MODEL_DIR = Path(os.getenv("MODEL_DIR", "./models"))
 
 
@@ -112,11 +111,11 @@ def features(frame: pd.DataFrame) -> np.ndarray:
     ))
 
 
-def train_model(session: Session) -> dict:
+def train_model(session: Session, cutoff: datetime = TRAINING_CUTOFF) -> dict:
     rows = session.execute(select(
         Measurement.turbine_id, Measurement.observed_at,
         Measurement.wind_speed_ms, Measurement.temperature_c, Measurement.normalized_power
-    ).where(Measurement.observed_at < TRAINING_CUTOFF)).all()
+    ).where(Measurement.observed_at < cutoff)).all()
     if len(rows) < 1000:
         raise ValueError("Import at least 1000 measurements before training")
     frame = pd.DataFrame(rows, columns=["turbine_id", "observed_at", "wind_speed_ms", "temperature_c", "normalized_power"])
@@ -163,14 +162,13 @@ def create_forecast(session: Session, issue_date: date, turbine_ids: list[int] |
     if revision_id is not None and revision is None:
         raise ValueError("Model revision not found")
     if revision is None:
-        artifact = joblib.load(MODEL_PATH)
+        raise FileNotFoundError("Train a versioned model first")
+    binary = session.get(ModelArtifact, revision.id)
+    if binary is not None:
+        artifact = joblib.load(io.BytesIO(binary.data))
     else:
-        binary = session.get(ModelArtifact, revision.id)
-        if binary is not None:
-            artifact = joblib.load(io.BytesIO(binary.data))
-        else:
-            # Older revisions created before model_artifacts was introduced.
-            artifact = joblib.load(revision.artifact_path)
+        # Older revisions created before model_artifacts was introduced.
+        artifact = joblib.load(revision.artifact_path)
     if turbine_ids is None:
         turbine_ids = list(artifact.get("turbine_ids", [1, 2]))
     if not turbine_ids or len(turbine_ids) != len(set(turbine_ids)):
@@ -182,6 +180,8 @@ def create_forecast(session: Session, issue_date: date, turbine_ids: list[int] |
     if len(turbines) != len(turbine_ids):
         raise ValueError("Unknown turbine")
     issued_at, weather_run_at = issue_and_weather_run(issue_date)
+    if revision is not None and revision.training_max_at >= issued_at.replace(tzinfo=None):
+        raise ValueError("Selected model was trained on measurements unavailable at forecast issue time")
     timeline = [issued_at.astimezone(timezone.utc) + timedelta(hours=offset) for offset in range(1, 49)]
     rows = []
     for turbine in turbines:
