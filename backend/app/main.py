@@ -5,10 +5,10 @@ import secrets
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
-from .db import ForecastRun, Measurement, ModelRevision, SessionLocal, Turbine, init_db
+from .db import ForecastPoint, ForecastRun, Measurement, ModelRevision, SessionLocal, Turbine, init_db
 from .pipeline import create_forecast, import_csv_stream, train_model
 from .turbines import coordinates_from_maps_url
 
@@ -173,11 +173,15 @@ def forecast(issue_date: date, options: ForecastInput | None = None,
 
 @app.get("/forecasts")
 def list_forecasts(session: Session = Depends(get_session)) -> list[dict]:
-    runs = session.scalars(select(ForecastRun).order_by(ForecastRun.issued_at.desc(),
-                                                       ForecastRun.id.desc()).limit(100)).all()
+    point_count = (select(func.count(ForecastPoint.id))
+                   .where(ForecastPoint.run_id == ForecastRun.id)
+                   .scalar_subquery())
+    runs = session.execute(select(ForecastRun, point_count)
+                           .order_by(ForecastRun.issued_at.desc(), ForecastRun.id.desc())
+                           .limit(100)).all()
     return [{"id": run.id, "issued_at": run.issued_at, "status": run.status,
-             "model_version": run.model_version, "point_count": len(run.points),
-             "turbine_ids": run.analysis.get("turbine_ids", [])} for run in runs]
+             "model_version": run.model_version, "point_count": count,
+             "turbine_ids": run.analysis.get("turbine_ids", [])} for run, count in runs]
 
 
 @app.get("/forecasts/{run_id}")

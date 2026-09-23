@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -8,6 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from backend.app.db import init_db
+from backend.app.db import ForecastPoint, ForecastRun
 from backend.app.main import app, get_session
 from backend.app.pipeline import SOURCE_COLUMNS
 
@@ -63,6 +65,19 @@ class ApiTests(unittest.TestCase):
                                               headers={"X-Admin-Key": "wrong"}).status_code, 401)
             self.assertEqual(self.client.post("/turbines", json=body,
                                               headers={"X-Admin-Key": "test-operator-secret"}).status_code, 201)
+
+    def test_forecast_history_counts_points_without_loading_full_run(self):
+        with Session(self.engine) as session:
+            run = ForecastRun(issued_at=datetime(2026, 2, 1), weather_run_at=datetime(2026, 1, 31),
+                              model_version="test", status="complete", analysis={"turbine_ids": [1]})
+            run.points.append(ForecastPoint(turbine_id=1, valid_at=datetime(2026, 2, 1, 1),
+                                            wind_speed_ms=5, temperature_c=0, normalized_power=0.2))
+            session.add(run)
+            session.commit()
+        history = self.client.get('/forecasts')
+        self.assertEqual(history.status_code, 200)
+        self.assertEqual(history.json()[0]['point_count'], 1)
+        self.assertEqual(history.json()[0]['turbine_ids'], [1])
 
 
 if __name__ == "__main__":
