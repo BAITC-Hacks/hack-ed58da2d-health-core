@@ -67,7 +67,11 @@ class BootstrapManager:
         directory = source_dir or Path(os.getenv("TZ_DIR", "TZ"))
         try:
             with session_factory() as session:
-                if session.scalar(select(ModelRevision.id).order_by(ModelRevision.id.desc()).limit(1)):
+                revision = session.scalar(select(ModelRevision).order_by(ModelRevision.id.desc()).limit(1))
+                artifact_id = (session.scalar(select(ModelArtifact.revision_id)
+                                              .where(ModelArtifact.revision_id == revision.id)) if revision else None)
+                if (revision and {1, 2}.issubset(set(revision.turbine_ids))
+                        and (artifact_id is not None or Path(revision.artifact_path).is_file())):
                     self._set("ready", "Модель загружена из PostgreSQL; прогнозирование доступно.", False)
                     return
                 paths = self._csv_paths(directory)
