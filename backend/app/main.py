@@ -36,7 +36,7 @@ class MeasurementInput(BaseModel):
 @app.get("/health")
 def health(session: Session = Depends(get_session)) -> dict:
     session.execute(text("SELECT 1"))
-    return {"status": "ok", "database": "ready"}
+    return {"status": "ok", "database": "ready", "database_backend": session.get_bind().dialect.name}
 
 
 @app.get("/measurements")

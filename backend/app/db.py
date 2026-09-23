@@ -75,5 +75,10 @@ def init_db(bind: Engine = engine) -> None:
             # These tables live in Supabase's exposed public schema. No anon or
             # authenticated policies exist: only the backend's DB connection uses them.
             for table_name in ("measurements", "forecast_runs", "forecast_points"):
-                connection.execute(text(f'ALTER TABLE public."{table_name}" ENABLE ROW LEVEL SECURITY'))
+                rls_enabled = connection.scalar(
+                    text("SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass(:table_name)"),
+                    {"table_name": f"public.{table_name}"},
+                )
+                if not rls_enabled:
+                    connection.execute(text(f'ALTER TABLE public."{table_name}" ENABLE ROW LEVEL SECURITY'))
         connection.execute(text("SELECT 1"))
