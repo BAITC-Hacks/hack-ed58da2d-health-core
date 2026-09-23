@@ -41,5 +41,6 @@ createApp({
         <div class="table-wrap"><table><thead><tr><th>Турбина</th><th>Время прогноза</th><th>Ветер, м/с</th><th>Температура, °C</th><th>Мощность, 0–1</th></tr></thead>
           <tbody><tr v-for="point in rows" :key="point.turbine_id + point.valid_at"><td>{{ point.turbine_id }}</td><td>{{ displayTime(point.valid_at) }}</td><td>{{ point.wind_speed_ms.toFixed(2) }}</td><td>{{ point.temperature_c.toFixed(1) }}</td><td>{{ point.normalized_power.toFixed(3) }}</td></tr></tbody></table></div>
       </section>
+      <p class="source">Погодные данные: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> / ECMWF IFS, CC BY 4.0.</p>
     </main>`
 }).mount('#app')

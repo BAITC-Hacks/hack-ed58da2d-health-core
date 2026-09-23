@@ -24,7 +24,24 @@
 
 Backend зависимости с точными версиями зафиксированы в `requirements.txt`: FastAPI, Uvicorn, SQLAlchemy, Psycopg 3, pandas, NumPy, scikit-learn, joblib, HTTPX, python-dotenv. Frontend зависимости находятся в `frontend/package.json`, а точные версии Vue 3, Vite и их транзитивных пакетов — в `frontend/package-lock.json`.
 
-Внешний погодный сервис: [Open-Meteo Single Runs API](https://open-meteo.com/en/docs/single-runs-api), модель ECMWF IFS HRES, доступ к конкретным архивным выпускам. Использование и лицензия погодных данных должны быть проверены перед публичным распространением результатов; сервис может иметь лимиты. Координаты обеих турбин предоставлены в ТЗ кейса через Google Maps. Другие внешние API не используются. Supabase, если выбран, предоставляет только PostgreSQL; работа приложения не зависит от его пользовательской авторизации.
+Внешний погодный сервис: [Open-Meteo Single Runs API](https://open-meteo.com/en/docs/single-runs-api), модель ECMWF IFS HRES, доступ к конкретным архивным выпускам. Источник данных — Open-Meteo с данными ECMWF; [лицензия API-данных CC BY 4.0](https://open-meteo.com/en/licence), атрибуция обязательна. [Бесплатный API](https://open-meteo.com/en/terms) разрешён для некоммерческого использования и имеет лимиты запросов; для коммерческого применения нужен соответствующий тариф. Координаты обеих турбин предоставлены в ТЗ кейса через Google Maps. Другие внешние API не используются. Supabase, если выбран, предоставляет только PostgreSQL; работа приложения не зависит от его пользовательской авторизации.
+
+Прямые зависимости и лицензии по метаданным установленных пакетов:
+
+| Компонент | Источник | Лицензия |
+|---|---|---|
+| FastAPI | [fastapi/fastapi](https://github.com/fastapi/fastapi) | MIT |
+| Uvicorn | [encode/uvicorn](https://github.com/encode/uvicorn) | BSD-3-Clause |
+| SQLAlchemy | [sqlalchemy/sqlalchemy](https://github.com/sqlalchemy/sqlalchemy) | MIT |
+| Psycopg 3 | [psycopg/psycopg](https://github.com/psycopg/psycopg) | LGPL-3.0-only |
+| pandas | [pandas-dev/pandas](https://github.com/pandas-dev/pandas) | BSD-3-Clause |
+| NumPy | [numpy/numpy](https://github.com/numpy/numpy) | BSD-3-Clause и лицензии отдельных частей, см. пакет |
+| scikit-learn | [scikit-learn/scikit-learn](https://github.com/scikit-learn/scikit-learn) | BSD-3-Clause |
+| joblib | [joblib/joblib](https://github.com/joblib/joblib) | BSD-3-Clause |
+| HTTPX | [encode/httpx](https://github.com/encode/httpx) | BSD-3-Clause |
+| python-dotenv | [theskumar/python-dotenv](https://github.com/theskumar/python-dotenv) | BSD-3-Clause |
+| Vue 3 | [vuejs/core](https://github.com/vuejs/core) | MIT |
+| Vite | [vitejs/vite](https://github.com/vitejs/vite) | MIT |
 
 ## Запуск в чистом окружении
 
