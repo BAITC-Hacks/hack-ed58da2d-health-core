@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Wind Power Forecasting">
+  <defs>
+    <linearGradient id="brand-gradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d987d"/>
+      <stop offset="1" stop-color="#07564f"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="17" fill="url(#brand-gradient)"/>
+  <path d="M10 20h14m-15 8h10m-6 8h9" fill="none" stroke="#b2f4db" stroke-width="2.5" stroke-linecap="round" opacity=".9"/>
+  <path d="M37 32v19m-9 0h18" fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round"/>
+  <circle cx="37" cy="29" r="3.2" fill="#fff"/>
+  <path d="M37 25V10c5 2 7 9 2 16M33.7 30.5l-13 8c-1-6 5-11 13-11M39.5 31.2l13 8c-5 4-12 2-15-6" fill="#e5fff4"/>
+  <path d="M28 54h18" fill="none" stroke="#b2f4db" stroke-width="2" stroke-linecap="round"/>
+</svg>

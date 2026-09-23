@@ -24,10 +24,11 @@ a { color: inherit; text-decoration: none; }
   position: sticky; top: 0; height: 100dvh; overflow-y: auto;
 }
 .sidebar-heading { display: flex; flex-direction: column; gap: 16px; }
-.brand { display: flex; align-items: center; gap: 9px; font-size: 29px; font-weight: 750; letter-spacing: -1.2px; padding: 0 8px; }
-.brand-mark { width: 40px; height: 40px; display: grid; place-items: center; background: var(--accent); border-radius: 10px; color: #fff; font-size: 33px; flex-shrink: 0; }
-.brand-light { font-weight: 400; }
-.brand small { display: block; font-size: 11px; letter-spacing: 1.6px; margin-top: 2px; color: var(--muted); }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 4px; min-width: 0; }
+.brand-mark { width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px; }
+.brand-name { display: flex; flex-direction: column; min-width: 0; font-size: 20px; font-weight: 600; line-height: 1.04; letter-spacing: -.6px; white-space: nowrap; }
+.brand-name strong { font-weight: 760; }
+.brand-name small { margin-top: 5px; color: var(--muted); font-size: 10px; font-weight: 600; letter-spacing: .15px; }
 .sidebar-toggle {
   display: flex; align-items: center; justify-content: center; gap: 9px;
   background: #f1f5f3; color: #365f4d; min-height: 40px; border-radius: 7px; font-size: 14px;
@@ -179,7 +180,9 @@ footer span:first-child { margin-right: auto; }
 }
 @media(max-width:850px) {
   .sidebar { width: 220px; padding: 18px 10px; }
-  .brand { font-size: 25px; padding: 0 4px; }
+  .brand { gap: 8px; padding: 0 2px; }
+  .brand-mark { width: 40px; height: 40px; }
+  .brand-name { font-size: 18px; }
   .nav-text { font-size: 14px; }
   main { padding: 20px 16px; }
   .topbar { padding: 10px 16px; flex-wrap: wrap; }
@@ -201,9 +204,8 @@ footer span:first-child { margin-right: auto; }
   .sidebar-heading { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; }
   .sidebar-toggle, .sidebar-collapsed .sidebar-toggle { flex-direction: row; gap: 7px; padding: 7px 10px; font-size: 13px; }
   .sidebar-collapsed .brand-name { display: block; }
-  .brand { font-size: 24px; }
-  .brand-mark { width: 34px; height: 34px; font-size: 28px; }
-  .brand small { font-size: 10px; }
+  .brand-mark { width: 38px; height: 38px; }
+  .brand-name { font-size: 19px; }
   .nav-label, .sidebar-bottom { display: none; }
   nav, .sidebar-collapsed nav { display: grid; margin: 12px 0 0; grid-template-columns: 1fr; gap: 4px; }
   nav button { min-height: 44px; }
@@ -239,7 +241,8 @@ footer span:first-child { margin-right: auto; }
   .agent .steps { grid-template-columns: 1fr; }
   .kpi > strong { font-size: 27px; }
   .sidebar-toggle .toggle-label { font-size: 12px; }
-  .brand { font-size: 22px; }
+  .brand-name { font-size: 17px; }
+  .brand-name small { font-size: 9px; }
 }
 @media(prefers-reduced-motion:reduce) {
   * { animation: none !important; transition: none !important; }

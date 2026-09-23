@@ -1,4 +1,6 @@
-# WindSight — frontend аналитики ВЭС
+# Wind Power Forecasting — frontend аналитики ВЭС
+
+Wind Power Forecasting — название проекта и сайта; HEALTH CORE — команда.
 
 Vue 3 + Vite. Запуск из этой папки: `npm ci`, затем `npm run dev`.
 Открыть http://127.0.0.1:5173. Для сборки: `npm run build`.
