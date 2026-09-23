@@ -1,0 +1,205 @@
+ 
+Инструкция по кибербезопасности 
+для участников хакатона 
+1. Общие положения 
+Настоящая инструкция устанавливает основные требования кибербезопасности для 
+участников хакатона. 
+Каждый участник использует собственное устройство и несет ответственность за его 
+безопасность, сохранность своих учетных данных и соблюдение установленных правил. 
+Участники обязаны выполнять требования организаторов и штаба кибербезопасности 
+мероприятия. 
+2. Требования к личным устройствам 
+До начала работы участник должен: 
+●      использовать исправное личное устройство; 
+●      установить актуальные обновления операционной системы и браузера; 
+●      включить пароль, PIN или другой способ блокировки экрана; 
+●      использовать антивирус и встроенный межсетевой экран; 
+●      обновить антивирус и провести сканирование устройства; 
+●      не отключать средства защиты устройства; 
+●      не использовать пиратское, неизвестное или вредоносное программное 
+обеспечение; 
+●      не оставлять устройство без присмотра в разблокированном состоянии; 
+●      не передавать устройство другим лицам. 
+3. Подключение к сети 
+Для работы разрешается использовать только официальную сеть хакатона. 
+Участник обязан: 
+●      подключаться к сети с официальным названием, указанным организаторами; 
+●      не подключаться к неизвестным сетям или сетям с похожими названиями; 
+
+
+●      не передавать параметры подключения посторонним лицам; 
+●      использовать защищенные протоколы при работе с сайтами, репозиториями и 
+API; 
+●      не изменять сетевые настройки для обхода ограничений. 
+Сеть хакатона является общей недоверенной средой. Запрещается пытаться получить 
+доступ к устройствам, учетным записям, данным или проектам других участников. 
+4. Запрет собственных точек доступа 
+На территории мероприятия запрещается: 
+●      создавать собственные Wi‑Fi-точки доступа; 
+●      использовать смартфон в режиме точки доступа или модема; 
+●      раздавать мобильный интернет с телефона, ноутбука или планшета; 
+●      подключать личные мобильные роутеры, USB-модемы и беспроводные 
+маршрутизаторы; 
+●      создавать сети с названием, похожим на официальную сеть хакатона; 
+●      использовать репитеры, беспроводные мосты и иные устройства для 
+самостоятельной организации сети; 
+●      проносить и использовать средства для пентестинга радиосетей. 
+Исключения допускаются только по разрешению организаторов для специально 
+согласованных случаев. 
+5. Работа с учетными данными и данными 
+Участник обязан: 
+●      использовать только собственную зарегистрированную учетную запись; 
+●      применять уникальный пароль и многофакторную аутентификацию, если она 
+доступна; 
+●      не передавать другим лицам пароли, API-ключи, токены и иные средства 
+доступа; 
+●      не размещать секреты в исходном коде, репозиториях, презентациях и чатах; 
+●      использовать только данные и сервисы, предоставленные или разрешенные 
+организаторами; 
+●      не загружать конфиденциальные, персональные или служебные данные в 
+сторонние сервисы без разрешения; 
+●      не копировать и не распространять данные хакатона; 
+●      после завершения мероприятия удалить временные ключи, токены и 
+локальные копии предоставленных данных. 
+
+При использовании AI-сервисов запрещается передавать им конфиденциальную 
+информацию и исходный код, если это не разрешено организаторами. Результаты, 
+созданные AI, участник обязан самостоятельно проверить на безопасность и 
+корректность. 
+6. Разработка и тестирование 
+Участники и/или Команды обязаны: 
+●      хранить проекты в защищенных репозиториях; 
+●      ограничивать доступ к репозиториям только участниками команды и 
+организаторами; 
+●      проверять используемые библиотеки и компоненты; 
+●      не использовать вредоносный код, скрытые учетные записи и механизмы 
+несанкционированного доступа; 
+●      не применять реальные продуктивные данные без разрешения; 
+●      не публиковать проект до проверки на наличие паролей, токенов и 
+конфиденциальной информации. 
+Без предварительного разрешения запрещается: 
+●      сканировать сеть и системы хакатона; 
+●      перехватывать или изменять сетевой трафик; 
+●      выполнять перебор паролей; 
+●      проводить нагрузочные, DoS- или DDoS-тесты; 
+●      атаковать Wi‑Fi-инфраструктуру; 
+●      получать доступ к ресурсам других команд; 
+●      обходить установленные ограничения и лимиты. 
+7. Сообщение об инцидентах 
+Участник обязан незамедлительно сообщить организаторам или в штаб 
+кибербезопасности, если: 
+●      потеряно устройство; 
+●      раскрыты пароль, токен или API-ключ; 
+●      обнаружен подозрительный вход в учетную запись; 
+●      выявлен доступ к данным другой команды; 
+●      обнаружено вредоносное ПО или подозрительная активность; 
+●      случайно опубликованы конфиденциальные данные; 
+●      обнаружена уязвимость в инфраструктуре или сервисах хакатона; 
+●      выявлена неизвестная или подозрительная Wi‑Fi-сеть. 
+
+Запрещается самостоятельно эксплуатировать обнаруженную уязвимость, скрывать 
+инцидент, публиковать сведения о нем или предпринимать действия, которые могут 
+ухудшить ситуацию. 
+8. Ответственность 
+За нарушение требований организаторы вправе: 
+●      ограничить или заблокировать сетевой доступ; 
+●      отозвать учетные записи, ключи и токены; 
+●      удалить проект или результаты команды; 
+●      отстранить участника от участия в хакатоне; 
+●      передать сведения уполномоченным лицам при наличии оснований. 
+Перед началом работы участник подтверждает, что ознакомился с настоящей 
+инструкцией и обязуется ее соблюдать. 
+ENG:  
+Cybersecurity Guidelines for Hackathon 
+Participants 
+1. General Provisions 
+These guidelines establish the basic cybersecurity requirements for hackathon participants. 
+Each participant uses their own device and is responsible for its security, the protection of their 
+credentials, and compliance with the established rules. 
+Participants must comply with the requirements of the organizers and the event cybersecurity 
+team. 
+2. Requirements for Personal Devices 
+Before starting work, each participant must: 
+● use a properly functioning personal device; 
+ ● install the latest operating system and browser updates; 
+ ● enable a password, PIN, or another screen-lock method; 
+ ● use antivirus software and the built-in firewall; 
+ ● update the antivirus software and scan the device; 
+
+ ● not disable device security features; 
+ ● not use pirated, unknown, or malicious software; 
+ ● not leave the device unattended while unlocked; 
+ ● not give the device to other people. 
+3. Network Connection 
+Only the official hackathon network may be used. 
+Participants must: 
+● connect only to the network with the official name specified by the organizers; 
+ ● not connect to unknown networks or networks with similar names; 
+ ● not share connection details with unauthorized persons; 
+ ● use secure protocols when accessing websites, repositories, and APIs; 
+ ● not modify network settings to bypass restrictions. 
+The hackathon network is a shared, untrusted environment. Attempting to access other 
+participants’ devices, accounts, data, or projects is prohibited. 
+4. Personal Hotspots Prohibited 
+The following are prohibited at the event venue: 
+● creating personal Wi-Fi hotspots; 
+ ● using a smartphone as a hotspot or modem; 
+ ● sharing mobile internet access from a phone, laptop, or tablet; 
+ ● connecting personal mobile routers, USB modems, or wireless routers; 
+ ● creating networks with names similar to the official hackathon network; 
+ ● using repeaters, wireless bridges, or other devices to set up an independent network; 
+ ● bringing in or using tools for wireless network penetration testing. 
+Exceptions are permitted only with the organizers’ approval in specifically authorized cases. 
+5. Credentials and Data 
+Participants must: 
+● use only their own registered account; 
+ ● use a unique password and multi-factor authentication where available; 
+ ● not share passwords, API keys, tokens, or other access credentials with others; 
+ ● not include secrets in source code, repositories, presentations, or chats; 
+ ● use only data and services provided or authorized by the organizers; 
+
+ ● not upload confidential, personal, or internal data to third-party services without permission; 
+ ● not copy or distribute hackathon data; 
+ ● delete temporary keys, tokens, and local copies of provided data after the event. 
+When using AI services, participants are prohibited from providing them with confidential 
+information or source code unless authorized by the organizers. Participants must 
+independently review AI-generated outputs for security and accuracy. 
+6. Development and Testing 
+Participants and/or teams must: 
+● store projects in secure repositories; 
+ ● restrict repository access to team members and organizers only; 
+ ● review the libraries and components they use; 
+ ● not use malicious code, hidden accounts, or unauthorized access mechanisms; 
+ ● not use real production data without permission; 
+ ● not publish a project before checking it for passwords, tokens, and confidential information. 
+Without prior authorization, it is prohibited to: 
+● scan the hackathon network or systems; 
+ ● intercept or modify network traffic; 
+ ● perform password brute-force attacks; 
+ ● conduct load, DoS, or DDoS testing; 
+ ● attack the Wi-Fi infrastructure; 
+ ● access other teams’ resources; 
+ ● bypass established restrictions or limits. 
+7. Incident Reporting 
+Participants must immediately notify the organizers or the cybersecurity team if: 
+● a device is lost; 
+ ● a password, token, or API key is exposed; 
+ ● suspicious account access is detected; 
+ ● access to another team’s data is discovered; 
+ ● malware or suspicious activity is detected; 
+ ● confidential data is accidentally published; 
+ ● a vulnerability is discovered in the hackathon infrastructure or services; 
+ ● an unknown or suspicious Wi-Fi network is detected. 
+Participants are prohibited from independently exploiting a discovered vulnerability, concealing 
+an incident, publishing information about it, or taking any action that could worsen the situation. 
+
+8. Responsibility 
+In the event of a violation, the organizers have the right to: 
+● restrict or block network access; 
+ ● revoke accounts, keys, and tokens; 
+ ● remove a project or a team’s results; 
+ ● disqualify a participant from the hackathon; 
+ ● provide relevant information to authorized persons where there are grounds to do so. 
+Before starting work, each participant confirms that they have read these guidelines and agrees 
+to comply with them. 
+ 

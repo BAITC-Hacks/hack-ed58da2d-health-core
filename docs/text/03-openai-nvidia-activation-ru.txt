@@ -1,0 +1,24 @@
+ 
+Активация OpenAI и NVIDIA для участников HackAlem AI 
+Используйте персональные ссылки и промокоды из Telegram-бота или платформы HackAlem 
+AI. 
+ChatGPT Pro и Codex 
+1. Откройте персональную ссылку ChatGPT Pro и войдите в свой аккаунт ChatGPT. 
+2. Подтвердите подписку, только если на странице оформления указано Due today: $0. 
+Проверьте дату следующего списания. 
+3. Откройте меню профиля ChatGPT и убедитесь, что отображается Pro. Скачайте Codex 
+на chatgpt.com/codex и войдите в тот же аккаунт. 
+OpenAI API кредиты для команды 
+1. Откройте отдельную ссылку API Credits, войдите в OpenAI Platform и подтвердите 
+промокод. 
+2. В Billing → Promotions проверьте, что начисление появилось в Applied promotions. 
+NVIDIA Brev 
+1. Откройте промоссылку NVIDIA Brev и войдите в аккаунт NVIDIA. При запросе создайте 
+NVIDIA Cloud Account. 
+2. В Billing нажмите Redeem Code, активируйте промокод и проверьте начисление в 
+Current Balance. 
+NVIDIA Build 
+1. Откройте build.nvidia.com/settings/api-keys и войдите в тот же аккаунт NVIDIA. 
+2. В API Keys нажмите Generate API Key, задайте название и срок действия. Скопируйте 
+созданный ключ и сохраните его в безопасном месте. 
+ 
