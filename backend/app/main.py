@@ -1,4 +1,5 @@
 from datetime import date, datetime
+import os
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,7 +17,12 @@ app.add_middleware(CORSMiddleware, allow_origins=["http://127.0.0.1:5173", "http
 
 @app.on_event("startup")
 def startup() -> None:
-    init_db()
+    if os.getenv('DB_INIT_ON_STARTUP', 'true').lower() in ('1', 'true', 'yes'):
+        init_db()
+    else:
+        # An existing shared database must not take DDL locks on every API start.
+        with SessionLocal() as session:
+            session.execute(text('SELECT 1'))
 
 
 def get_session():
