@@ -1,8 +1,8 @@
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 from dotenv import load_dotenv
-from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, JSON, String, UniqueConstraint, create_engine, text
+from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, JSON, LargeBinary, String, UniqueConstraint, create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
@@ -55,13 +55,20 @@ class ModelRevision(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     version: Mapped[str] = mapped_column(String(64), unique=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     artifact_path: Mapped[str] = mapped_column(String(500))
     training_rows: Mapped[int] = mapped_column(Integer)
     validation_rows: Mapped[int] = mapped_column(Integer)
     validation_mae: Mapped[float] = mapped_column(Float)
     training_max_at: Mapped[datetime] = mapped_column(DateTime)
     turbine_ids: Mapped[list] = mapped_column(JSON)
+
+
+class ModelArtifact(Base):
+    __tablename__ = "model_artifacts"
+
+    revision_id: Mapped[int] = mapped_column(ForeignKey("model_revisions.id"), primary_key=True)
+    data: Mapped[bytes] = mapped_column(LargeBinary)
 
 
 class ForecastRun(Base):
@@ -98,7 +105,7 @@ def init_db(bind: Engine = engine) -> None:
         if bind.dialect.name == "postgresql":
             # These tables live in Supabase's exposed public schema. No anon or
             # authenticated policies exist: only the backend's DB connection uses them.
-            for table_name in ("measurements", "forecast_runs", "forecast_points", "turbines", "model_revisions"):
+            for table_name in ("measurements", "forecast_runs", "forecast_points", "turbines", "model_revisions", "model_artifacts"):
                 rls_enabled = connection.scalar(
                     text("SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass(:table_name)"),
                     {"table_name": f"public.{table_name}"},

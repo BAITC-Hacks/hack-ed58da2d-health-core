@@ -10,7 +10,7 @@ def main() -> None:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("init-db")
     importer = commands.add_parser("import-csv")
-    importer.add_argument("turbine_id", type=int, choices=(1, 2))
+    importer.add_argument("turbine_id", type=int)
     importer.add_argument("path", type=Path)
     commands.add_parser("train")
     args = parser.parse_args()

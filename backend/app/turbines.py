@@ -10,7 +10,8 @@ ALLOWED_HOSTS = {"maps.app.goo.gl", "maps.google.com", "www.google.com", "google
 
 
 def _coordinates_from_url(url: str) -> tuple[float, float] | None:
-    for pattern in (r"@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)",
+    for pattern in (r"/maps/search/(-?\d+(?:\.\d+)?),\+?(-?\d+(?:\.\d+)?)",
+                    r"@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)",
                     r"!3d(-?\d+(?:\.\d+)?)[!&]4d(-?\d+(?:\.\d+)?)",
                     r"[?&](?:q|ll)=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)"):
         match = re.search(pattern, url)

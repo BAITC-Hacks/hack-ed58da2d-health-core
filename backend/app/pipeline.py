@@ -16,7 +16,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
-from .db import ForecastPoint, ForecastRun, Measurement, ModelRevision, Turbine
+from .db import ForecastPoint, ForecastRun, Measurement, ModelArtifact, ModelRevision, Turbine
 from .weather import KAZAKHSTAN_OFFSET, fetch_weather, issue_and_weather_run
 
 SOURCE_COLUMNS = (
@@ -26,6 +26,7 @@ SOURCE_COLUMNS = (
     "Нормализованная активная мощность",
     "Средняя температура окружающей среды(°C)",
 )
+TRAINING_CUTOFF = datetime(2026, 2, 1)
 MODEL_PATH = Path(os.getenv("MODEL_PATH", "./model.joblib"))
 MODEL_DIR = Path(os.getenv("MODEL_DIR", "./models"))
 
@@ -115,7 +116,7 @@ def train_model(session: Session) -> dict:
     rows = session.execute(select(
         Measurement.turbine_id, Measurement.observed_at,
         Measurement.wind_speed_ms, Measurement.temperature_c, Measurement.normalized_power
-    )).all()
+    ).where(Measurement.observed_at < TRAINING_CUTOFF)).all()
     if len(rows) < 1000:
         raise ValueError("Import at least 1000 measurements before training")
     frame = pd.DataFrame(rows, columns=["turbine_id", "observed_at", "wind_speed_ms", "temperature_c", "normalized_power"])
@@ -141,6 +142,8 @@ def train_model(session: Session) -> dict:
                              training_max_at=frame["observed_at"].max().to_pydatetime(), turbine_ids=turbine_ids)
     try:
         session.add(revision)
+        session.flush()
+        session.add(ModelArtifact(revision_id=revision.id, data=artifact_path.read_bytes()))
         session.commit()
         session.refresh(revision)
     except Exception:
@@ -162,7 +165,12 @@ def create_forecast(session: Session, issue_date: date, turbine_ids: list[int] |
     if revision is None:
         artifact = joblib.load(MODEL_PATH)
     else:
-        artifact = joblib.load(revision.artifact_path)
+        binary = session.get(ModelArtifact, revision.id)
+        if binary is not None:
+            artifact = joblib.load(io.BytesIO(binary.data))
+        else:
+            # Older revisions created before model_artifacts was introduced.
+            artifact = joblib.load(revision.artifact_path)
     if turbine_ids is None:
         turbine_ids = list(artifact.get("turbine_ids", [1, 2]))
     if not turbine_ids or len(turbine_ids) != len(set(turbine_ids)):
