@@ -1,46 +1,58 @@
 import { createApp } from 'vue'
+import { request, utc, issueTime, pointsFor, summarize, validatePoints } from './model.js'
 import './style.css'
 
-const api = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
-
 createApp({
-  data: () => ({ date: '2026-01-31', loading: false, error: '', run: null, rows: [] }),
-  methods: {
-    async generate() {
-      this.error = ''
-      this.loading = true
-      try {
-        const created = await fetch(`${api}/forecasts/${this.date}`, { method: 'POST' })
-        const result = await created.json()
-        if (!created.ok) throw new Error(result.detail || 'Ошибка расчёта')
-        const response = await fetch(`${api}/forecasts/${result.id}`)
-        if (!response.ok) throw new Error('Прогноз не загрузился')
-        this.run = await response.json()
-        this.rows = this.run.points
-      } catch (error) {
-        this.error = error.message
-      } finally {
-        this.loading = false
-      }
-    },
-    displayTime(value) { return `${value.replace('T', ' ')} UTC` }
+  data:()=>({date:'2026-01-31',turbine:1,horizon:48,metric:'normalized_power',busy:false,error:'',run:null,health:'checking',active:'forecast',hovered:0,history:[],lookup:''}),
+  computed:{
+    rows(){return pointsFor(this.run,this.turbine,this.horizon)},
+    stats(){return summarize(this.rows)},
+    issues(){return this.run?validatePoints(this.rows,this.horizon,this.run.issued_at):[]},
+    selected(){return this.rows[Math.min(this.hovered,this.rows.length-1)]},
+    metricLabel(){return {normalized_power:'Нормализованная мощность',wind_speed_ms:'Скорость ветра, м/с',temperature_c:'Температура, °C'}[this.metric]},
+    range(){if(this.metric==='normalized_power')return [0,1];const v=this.rows.map(p=>p[this.metric]).filter(Number.isFinite);return v.length?[Math.min(0,...v)-1,Math.max(...v)+1]:[0,1]},
+    line(){return this.rows.filter(p=>Number.isFinite(p[this.metric])).map(p=>`${this.x(this.rows.indexOf(p))},${this.y(p[this.metric])}`).join(' ')},
+    area(){return this.rows.length?`48,248 ${this.line} ${this.x(this.rows.length-1)},248`:''},
+    ticks(){return [0,1,2,3,4].map(i=>this.range[0]+(this.range[1]-this.range[0])*i/4)},
+    weatherBefore(){return this.run?utc(this.run.weather_run_at)<=issueTime(this.run.issued_at):false}
   },
-  template: `
-    <main>
-      <header><p class="eyebrow">Health Core · ВЭС</p><h1>Почасовой прогноз выработки</h1>
-        <p>Две турбины · ECMWF IFS · 48 часов · нормализованная мощность</p></header>
-      <section class="panel">
-        <label for="date">Дата расчёта, Казахстан (UTC+5)</label>
-        <div class="controls"><input id="date" v-model="date" type="date" /><button @click="generate" :disabled="loading">{{ loading ? 'Считаем…' : 'Сформировать прогноз' }}</button></div>
-        <p v-if="error" class="error" role="alert">{{ error }}</p>
-        <p class="hint">Для расчёта нужна обученная модель на сервере. Выбранный выпуск погоды определяется датой расчёта.</p>
-      </section>
-      <section v-if="run" class="panel">
-        <h2>Прогноз #{{ run.id }}</h2>
-        <p>Выпуск погоды: {{ displayTime(run.weather_run_at) }} · модель: {{ run.model_version }} · {{ rows.length }} точек</p>
-        <div class="table-wrap"><table><thead><tr><th>Турбина</th><th>Время прогноза</th><th>Ветер, м/с</th><th>Температура, °C</th><th>Мощность, 0–1</th></tr></thead>
-          <tbody><tr v-for="point in rows" :key="point.turbine_id + point.valid_at"><td>{{ point.turbine_id }}</td><td>{{ displayTime(point.valid_at) }}</td><td>{{ point.wind_speed_ms.toFixed(2) }}</td><td>{{ point.temperature_c.toFixed(1) }}</td><td>{{ point.normalized_power.toFixed(3) }}</td></tr></tbody></table></div>
-      </section>
-      <p class="source">Погодные данные: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> / ECMWF IFS, CC BY 4.0.</p>
-    </main>`
+  mounted(){this.checkHealth()},
+  methods:{
+    async checkHealth(){this.health='checking';try{const r=await request('/health');this.health=r.status==='ok'?'ok':'error'}catch{this.health='error'}},
+    num(v,n=2){return Number.isFinite(v)?v.toFixed(n):'—'},
+    time(v,issue=false){if(!v)return 'Не передано';const d=issue?issueTime(v):utc(v);return Number.isNaN(+d)?'Некорректная дата':new Intl.DateTimeFormat('ru-RU',{timeZone:'Asia/Almaty',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(d)},
+    hour(v){const d=utc(v);return Number.isNaN(+d)?'—':new Intl.DateTimeFormat('ru-RU',{timeZone:'Asia/Almaty',hour:'2-digit',minute:'2-digit'}).format(d)},
+    x(i){return 48+i*800/Math.max(1,this.rows.length-1)},
+    y(v){return 248-(v-this.range[0])/(this.range[1]-this.range[0])*204},
+    async load(id){const r=await request(`/forecasts/${encodeURIComponent(id)}`);if(!Array.isArray(r.points)||!r.points.length)throw new Error('Сервер вернул прогноз без почасовых значений.');this.run=r;this.hovered=0;this.active='forecast';if(!this.history.some(x=>x.id===r.id))this.history.unshift(r)},
+    async generate(){this.error='';this.busy=true;try{const r=await request(`/forecasts/${this.date}`,{method:'POST'});await this.load(r.id);this.health='ok'}catch(e){this.error=e.message}finally{this.busy=false}},
+    async openRun(id){this.error='';this.busy=true;try{await this.load(id)}catch(e){this.error=e.message}finally{this.busy=false}},
+    exportCsv(){const csv='\uFEFF'+['valid_at_utc,turbine_id,normalized_power,wind_speed_ms,temperature_c',...this.rows.map(p=>[utc(p.valid_at).toISOString(),p.turbine_id,p.normalized_power,p.wind_speed_ms,p.temperature_c].join(','))].join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=`forecast-${this.run.id}-turbine-${this.turbine}-${this.horizon}h.csv`;a.click();URL.revokeObjectURL(url)}
+  },
+  template:`
+  <div class="shell">
+    <aside class="sidebar"><a class="brand" href="#" @click.prevent="active='forecast'"><span class="brand-mark">✳</span><span>wind<span class="brand-light">sight</span><small>HEALTH CORE / ANALYTICS</small></span></a>
+      <p class="nav-label">РАБОЧЕЕ ПРОСТРАНСТВО</p>
+      <nav aria-label="Разделы"><button :class="{selected:active==='forecast'}" @click="active='forecast'" aria-label="Обзор прогноза">◈ <span>Обзор прогноза</span></button><button :class="{selected:active==='history'}" @click="active='history'" aria-label="История расчётов">▦ <span>История расчётов</span><small>{{history.length}}</small></button><button :class="{selected:active==='sources'}" @click="active='sources'" aria-label="Источники данных">◎ <span>Источники данных</span></button></nav>
+      <div class="sidebar-bottom"><div class="live-dot"></div><strong>Февраль 2026</strong><p>Историческое прогнозирование<br>01.02 — 28.02.2026</p><span class="tag">HACKALEM AI</span></div>
+    </aside>
+    <div class="workspace"><header class="topbar"><span>Рабочее пространство <b>/</b> Аналитика ВЭС</span><button class="status" @click="checkHealth" :class="health" aria-label="Проверить доступность API"><i></i>{{health==='ok'?'API подключён':health==='checking'?'Проверка API…':'API недоступен'}} ↻</button></header>
+    <main><div class="page-heading"><div><p class="eyebrow">WIND ENERGY INTELLIGENCE</p><h1>{{active==='history'?'История расчётов':active==='sources'?'Источники данных':'Энергия ветра. В цифрах.'}}</h1><p class="subtitle">Почасовой прогноз мощности и прозрачный цикл работы AI-агента.</p></div><span class="period">◷ &nbsp; UTC+5 · Казахстан</span></div>
+    <form class="panel controls" @submit.prevent="generate"><label>Объект<select v-model="turbine"><option :value="1">Турбина 01</option><option :value="2">Турбина 02</option></select></label><label>Дата выпуска · 00:00<input v-model="date" type="date" min="2026-01-31" max="2026-02-28" required :disabled="busy"></label><fieldset><legend>Горизонт просмотра</legend><div class="segmented"><button v-for="h in [24,48]" :key="h" type="button" :class="{on:horizon===h}" :aria-pressed="horizon===h" @click="horizon=h;hovered=0">{{h}} {{h === 24 ? 'часа' : 'часов'}}</button></div></fieldset><button class="primary" type="submit" :disabled="busy">{{busy?'Ожидаем результат…':'✧  Запустить агента'}} <span v-if="!busy">↗</span></button></form>
+    <p class="micro">Сервер рассчитывает 48 часов для двух турбин. Выбор горизонта меняет отображение результата.</p>
+    <div v-if="error" class="notice error" role="alert">{{error}}</div><div v-if="busy" class="notice" role="status"><span class="spinner"></span> Ожидаем ответ сервера. API передаёт итоговый статус без промежуточных этапов. Последний полученный результат остаётся доступен ниже.</div>
+    <div v-if="run" class="result-context">Выпуск: <strong>{{time(run.issued_at,true)}}</strong> · Прогноз #{{run.id}} · Турбина {{turbine}}<span class="tag">{{run.status==='complete'?'Расчёт завершён':run.status}}</span></div>
+    <section v-show="active==='forecast'">
+      <div class="kpis"><article class="panel kpi"><span>Средняя мощность <i>↗</i></span><strong>{{num(stats.mean,3)}} <small>0–1</small></strong><p>На выбранном горизонте</p></article><article class="panel kpi"><span>Пиковая мощность <i>⌁</i></span><strong>{{num(stats.peak?.normalized_power,3)}} <small>0–1</small></strong><p>{{stats.peak?time(stats.peak.valid_at):'Ожидает расчёта'}}</p></article><article class="panel kpi"><span>Средний ветер <i>≋</i></span><strong>{{num(stats.wind,1)}} <small>м/с</small></strong><p>Архивный прогноз погоды</p></article><article class="panel kpi"><span>Покрытие горизонта <i>◷</i></span><strong>{{run?rows.length:'—'}} <small>/ {{horizon}} ч</small></strong><p>{{run?(issues.length?'Нужна проверка данных':'Почасовые значения получены'):'Ожидает расчёта'}}</p></article></div>
+      <div class="chart-layout"><section class="panel chart-card"><div class="section-head"><div><h2>Профиль прогноза</h2><p>{{metricLabel}} · {{horizon}} часов</p></div><span class="legend"><i></i> Турбина {{turbine}}</span></div><div class="chart-tabs"><button v-for="(label,key) in {normalized_power:'Мощность',wind_speed_ms:'Ветер',temperature_c:'Температура'}" :key="key" :class="{on:metric===key}" :aria-pressed="metric===key" @click="metric=key">{{label}}</button></div>
+      <div v-if="!rows.length" class="empty-chart"><div class="empty-icon">⌁</div><h3>Начните с первого прогноза</h3><p>Выберите дату выпуска и запустите агента.<br>Здесь появится почасовой профиль мощности ВЭС.</p><span>24–48 часов · 2 турбины · архивная погода</span></div>
+      <template v-else><div class="chart-readout" aria-live="polite">{{selected?time(selected.valid_at):''}} <strong>{{num(selected?.[metric],3)}}</strong></div><svg class="forecast-chart" viewBox="0 0 880 290" role="img" :aria-label="metricLabel+'; точные значения в таблице ниже'"><defs><linearGradient id="fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#179985" stop-opacity=".24"/><stop offset="100%" stop-color="#179985" stop-opacity=".01"/></linearGradient></defs><g v-for="tick in ticks" :key="tick"><line x1="48" x2="848" :y1="y(tick)" :y2="y(tick)" stroke="#e8eeed" stroke-dasharray="4 5"/><text x="0" :y="y(tick)+4">{{num(tick,1)}}</text></g><polygon :points="area" fill="url(#fill)"/><polyline :points="line" fill="none" stroke="#128b79" stroke-width="3" stroke-linejoin="round"/><g v-for="(p,i) in rows" :key="p.valid_at+'-'+i"><text v-if="i%Math.ceil(rows.length/6)===0" :x="x(i)" y="280" text-anchor="middle">{{hour(p.valid_at)}}</text><line v-if="hour(p.valid_at)==='00:00'" :x1="x(i)" :x2="x(i)" y1="30" y2="248" stroke="#aac7bc" stroke-dasharray="3 4"/><circle v-if="Number.isFinite(p[metric])" :cx="x(i)" :cy="y(p[metric])" :r="hovered===i?5:3" fill="#128b79"/><rect :x="x(i)-8" y="25" width="16" height="230" fill="transparent" @mouseenter="hovered=i" @click="hovered=i"><title>{{time(p.valid_at)}}: {{num(p[metric],3)}}</title></rect></g></svg><label class="chart-scrubber">Час прогноза<input type="range" min="0" :max="rows.length-1" v-model.number="hovered" :aria-valuetext="selected?time(selected.valid_at):''"></label></template><div class="chart-footer"><span>● &nbsp; Прогноз модели</span><span>Нормализованная мощность, не МВт·ч</span></div></section>
+      <section class="panel agent"><div class="section-head"><h2>AI-агент</h2><span class="tag">{{busy?'Ожидание ответа':run?'Есть результат':'Ожидание'}}</span></div><p class="muted">Этапы серверного процесса</p><ol class="steps"><li v-for="(s,i) in ['Архивный прогноз погоды','Подготовка признаков','Модель прогнозирования','Анализ результата','Сохранение прогноза']" :key="s"><span class="step-number">{{i+1}}</span><div><strong>{{s}}</strong><small>Отдельный статус не передан</small></div></li></ol><p class="agent-note">API пока передаёт только итог запуска. При обновлении входных данных повторно запустите агента.</p></section></div>
+      <div v-if="issues.length" class="notice error" role="alert"><div v-for="s in issues" :key="s">{{s}}</div></div>
+      <section class="panel table-card"><div class="section-head"><div><h2>Почасовая детализация</h2><p>Значения прогноза и погодные признаки · UTC+5</p></div><button class="secondary" @click="exportCsv" :disabled="!rows.length || !!issues.length">↓ Экспорт CSV</button></div><div class="table-wrap"><table><thead><tr><th>Время прогноза</th><th>Мощность, 0–1</th><th>Ветер, м/с</th><th>Температура, °C</th></tr></thead><tbody><tr v-for="(p,i) in rows" :key="p.valid_at+'-'+i"><td>{{time(p.valid_at)}}</td><td><span class="power-bar" :style="{'--power':Math.min(100,Math.max(0,p.normalized_power*100))+'%'}"></span>{{num(p.normalized_power,3)}}</td><td>{{num(p.wind_speed_ms)}}</td><td>{{num(p.temperature_c,1)}}</td></tr><tr v-if="!rows.length"><td colspan="4" class="empty-table">После расчёта здесь появятся {{horizon}} почасовых значений.</td></tr></tbody></table></div></section>
+    </section>
+    <section v-if="active==='sources'" class="panel provenance"><div class="section-head"><h2>Происхождение прогноза</h2><span class="tag">{{run?'Прогноз #'+run.id:'Нет результата'}}</span></div><dl><div><dt>Источник погоды</dt><dd>{{run?.analysis?.source || 'Будет получен с результатом'}}</dd></div><div><dt>Момент выпуска прогноза ВЭС</dt><dd>{{time(run?.issued_at,true)}}</dd></div><div><dt>Инициализация погодного выпуска</dt><dd>{{time(run?.weather_run_at)}}</dd></div><div><dt>Версия модели</dt><dd>{{run?.model_version || 'Не передано'}}</dd></div><div><dt>Исторический срез обучения</dt><dd>API пока не передаёт</dd></div><div><dt>Время публикации погодного выпуска</dt><dd>API пока не передаёт</dd></div><div><dt>Координаты турбины</dt><dd>API пока не передаёт</dd></div><div><dt>Минимальная мощность на горизонте</dt><dd>{{num(stats.low?.normalized_power,3)}} · {{stats.low?time(stats.low.valid_at):'Нет результата'}}</dd></div></dl><div class="notice" :class="{error:run&&!weatherBefore}">{{run?(weatherBefore?'Инициализация погоды не позже выпуска ВЭС. Это не подтверждает время публикации или отсутствие утечки в обучении.':'Погодный выпуск позже выпуска ВЭС. Не используйте этот результат без проверки.'):'Запустите прогноз, чтобы проверить происхождение данных.'}}</div><p class="muted">Февральские фактические значения и метрики ошибки не предоставлены. Мощность отображается в нормализованной шкале 0–1.</p></section>
+    <section v-if="active==='history'" class="panel history-card"><div class="section-head"><div><h2>Ежедневные выпуски</h2><p>31 января — 28 февраля 2026</p></div><span class="tag">{{history.length}} в этой сессии</span></div><form class="lookup" @submit.prevent="openRun(lookup)"><label for="lookup">Открыть сохранённый прогноз по ID</label><input id="lookup" v-model="lookup" type="number" min="1" required placeholder="ID прогноза"><button class="secondary" :disabled="busy">Открыть</button></form><div class="notice">Автоматический последовательный прогон февраля пока недоступен в backend. Отдельный день можно рассчитать в панели выше. Список ниже содержит только результаты текущей сессии.</div><div class="run-list"><button v-for="r in history" :key="r.id" @click="openRun(r.id)" :disabled="busy"><span>#{{r.id}} · {{time(r.issued_at,true)}}</span><span>{{r.points.length}} точек · Открыть ↗</span></button><p v-if="!history.length" class="empty-table">В этой сессии пока нет расчётов.</p></div></section>
+    <footer>HEALTH CORE <span>Agentic AI для прогнозирования выработки ВЭС</span><span>Погода: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> / ECMWF IFS, CC BY 4.0</span></footer>
+    </main></div></div>`
 }).mount('#app')
