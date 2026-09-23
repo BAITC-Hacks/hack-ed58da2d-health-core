@@ -10,7 +10,6 @@ const assert = require('node:assert/strict')
  const turbines=[{id:1,name:'Турбина 01',latitude:43.64515,longitude:78.535604},{id:2,name:'Турбина 02',latitude:43.643198,longitude:78.538828}]
  const models=[{id:1,version:'TEST-FIXTURE',validation_mae:.03,training_rows:1000,training_max_at:'2026-01-30T23:00:00',turbine_ids:[1,2]}]
  let fail=false,weatherFail=false
- let requireKey=false
  let availability={status:'ready',can_forecast:true,message:'Модель обучена; прогнозирование доступно.',supported_turbine_ids:[1,2]}
  await page.route('https://maps.googleapis.com/**',route=>{
    const callback=new URL(route.request().url()).searchParams.get('callback')
@@ -31,7 +30,7 @@ const assert = require('node:assert/strict')
  })
  await page.route('http://127.0.0.1:8000/**',route=>{
    const path=new URL(route.request().url()).pathname
-   if(requireKey&&route.request().method()==='POST')assert.equal(route.request().headers()['x-admin-key'],'TEST-OPERATOR-KEY')
+   if(route.request().method()==='POST')assert.equal(route.request().headers()['x-admin-key'],undefined)
    const newTurbine=path==='/turbines'&&route.request().method()==='POST'?{id:3,...route.request().postDataJSON()}:null
    if(newTurbine)turbines.push(newTurbine)
    const payload=path==='/health'?{status:'ok'}:path==='/readiness'?availability:newTurbine||path==='/turbines'?newTurbine||turbines:path==='/models'?models:path==='/forecasts'?[{id:7,issued_at:run.issued_at,status:'complete',point_count:96}]:path.startsWith('/measurements/upload')?{rows:1,imported:1,skipped:0}:path==='/models/train'?{revision_id:1,model_version:'TEST-FIXTURE',validation_mae:.03,warning:''}:route.request().method()==='POST'?{id:7}:run
@@ -137,8 +136,7 @@ const assert = require('node:assert/strict')
  await page.getByRole('button',{name:'Данные и модели',exact:true}).click()
  await page.getByText('Загрузка обучающих данных',{exact:true}).waitFor()
  await page.getByText('TEST-FIXTURE',{exact:true}).waitFor()
- await page.getByRole('textbox',{name:'Ключ оператора для создания и расчёта'}).fill('TEST-OPERATOR-KEY')
- requireKey=true
+ assert.equal(await page.getByRole('textbox',{name:'Ключ оператора для создания и расчёта'}).count(),0)
  await page.getByRole('textbox',{name:'Название'}).fill('Турбина 03')
  await page.getByRole('spinbutton',{name:'Широта'}).fill('43.7')
  await page.getByRole('spinbutton',{name:'Долгота'}).fill('78.6')

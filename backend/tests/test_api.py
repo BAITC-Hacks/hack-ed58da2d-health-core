@@ -17,7 +17,7 @@ from backend.app.pipeline import SOURCE_COLUMNS
 
 class ApiTests(unittest.TestCase):
     def setUp(self):
-        self.env_patch = patch.dict("os.environ", {"API_WRITE_KEY": "", "APP_ENV": "development"})
+        self.env_patch = patch.dict("os.environ", {"APP_ENV": "development"})
         self.env_patch.start()
         self.temp = tempfile.TemporaryDirectory()
         self.engine = create_engine(f"sqlite:///{(Path(self.temp.name) / 'api.sqlite3').as_posix()}",
@@ -56,7 +56,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.client.post("/models/train").status_code, 422)
         self.assertEqual(self.client.post("/models/train", json={"cutoff_date": "2026-02-02"}).status_code, 422)
 
-    def test_operator_key_protects_writes_without_blocking_reads(self):
+    def test_writes_are_public_even_with_legacy_operator_key_configured(self):
         self.assertEqual(self.client.get('/forecasts').json(), [])
         readiness = self.client.get('/readiness')
         self.assertEqual(readiness.status_code, 200)
@@ -69,11 +69,7 @@ class ApiTests(unittest.TestCase):
         with patch.dict("os.environ", {"API_WRITE_KEY": "test-operator-secret"}):
             self.assertEqual(self.client.get("/turbines").status_code, 200)
             body = {"name": "Турбина 03", "latitude": 43.7, "longitude": 78.6}
-            self.assertEqual(self.client.post("/turbines", json=body).status_code, 401)
-            self.assertEqual(self.client.post("/turbines", json=body,
-                                              headers={"X-Admin-Key": "wrong"}).status_code, 401)
-            self.assertEqual(self.client.post("/turbines", json=body,
-                                              headers={"X-Admin-Key": "test-operator-secret"}).status_code, 201)
+            self.assertEqual(self.client.post("/turbines", json=body).status_code, 201)
 
     def test_forecast_history_counts_points_without_loading_full_run(self):
         with Session(self.engine) as session:

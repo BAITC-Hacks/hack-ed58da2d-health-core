@@ -59,8 +59,6 @@ nav button small { margin-left: auto; font-size: 13px; }
 .forecast-state { padding: 7px 9px; border-radius: 6px; background: #fff3df; color: #80531a; font-size: 12px; white-space: nowrap; }
 .forecast-state.ready { background: #e5f3ea; color: #276744; }
 .forecast-state.unavailable { background: #fff0e9; color: #923f2d; }
-.operator-key { display:flex; align-items:center; gap:8px; margin-left:auto; font-size:12px; white-space:nowrap; }
-.operator-key input { width:150px; min-height:36px; padding:7px 9px; border:1px solid var(--border); border-radius:8px; font:inherit; }
 .status { background: transparent; color: #486451; font-size: 14px; min-height: 36px; white-space: nowrap; }
 .status i { display: inline-block; width: 8px; height: 8px; background: #a96a11; border-radius: 50%; margin-right: 6px; }
 .status.ok i { background: #17825c; }
@@ -249,8 +247,6 @@ footer span:first-child { margin-right: auto; }
   .topbar > span:first-child { display: none; }
   .forecast-state { order: 3; width: 100%; text-align: center; }
   .topbar .status { order: 2; margin-left: auto; font-size: 12px; }
-  .operator-key { order: 1; margin-left:0; }
-  .operator-key input { width:110px; }
   .page-heading { margin-bottom: 18px; }
   .eyebrow { font-size: 11px; }
   h1 { font-size: 27px; }
