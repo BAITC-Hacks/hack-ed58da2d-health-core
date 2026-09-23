@@ -8,9 +8,10 @@ const assert = require('node:assert/strict')
  const points=Array.from({length:96},(_,i)=>({turbine_id:i<48?1:2,valid_at:new Date(Date.UTC(2026,0,30,20+i%48)).toISOString(),normalized_power:Math.round((.45+.25*Math.sin((i%48)/7))*1000)/1000,wind_speed_ms:6+(i%9)/2,temperature_c:-8+i%6}))
  const run={id:7,issued_at:'2026-01-31T00:00:00',weather_run_at:'2026-01-30T12:00:00',model_version:'TEST-FIXTURE',status:'complete',analysis:{source:'TEST FIXTURE — NOT REAL WEATHER'},points}
  let fail=false
+ await page.route('https://maps.googleapis.com/**',route=>route.fulfill({status:200,contentType:'application/javascript',body:`window.google={maps:{MapTypeId:{TERRAIN:'terrain',ROADMAP:'roadmap',SATELLITE:'satellite'},LatLngBounds:class{extend(){}},Map:class{constructor(el,opts){this.element=el;this.options=opts}fitBounds(){}panTo(){}setZoom(){}},InfoWindow:class{setContent(){}open(){}},importLibrary:async name=>name==='maps'?{Map:window.google.maps.Map,InfoWindow:window.google.maps.InfoWindow,LatLngBounds:window.google.maps.LatLngBounds,MapTypeId:window.google.maps.MapTypeId}:{AdvancedMarkerElement:class{constructor(opts){Object.assign(this,opts)}addEventListener(){}},PinElement:class{constructor(){this.element=document.createElement('div')}}}}}`}))
  await page.route('http://127.0.0.1:8000/**',route=>{
    const path=new URL(route.request().url()).pathname
-   route.fulfill({status:fail?409:200,contentType:'application/json',body:JSON.stringify(fail?{detail:'Train the model first'}:path==='/health'?{status:'ok'}:route.request().method()==='POST'?{id:7}:run)})
+   route.fulfill({status:fail?409:200,contentType:'application/json',body:JSON.stringify(fail?{detail:'Train the model first'}:path==='/health'?{status:'ok'}:path==='/turbines'?[{id:1,name:'Турбина 01',latitude:43.645150,longitude:78.535604},{id:2,name:'Турбина 02',latitude:43.643198,longitude:78.538828}]:route.request().method()==='POST'?{id:7}:run)})
  })
  await page.goto('http://127.0.0.1:5173')
  await page.getByText('Начните с первого прогноза').waitFor()
@@ -60,6 +61,11 @@ const assert = require('node:assert/strict')
  await page.getByLabel('Открыть сохранённый прогноз по ID').fill('7')
  await page.getByRole('button',{name:'Открыть',exact:true}).click()
  await page.locator('tbody tr').nth(47).waitFor()
+ await page.getByRole('button',{name:'География ВЭС',exact:true}).click()
+ await page.getByRole('heading',{name:'География ВЭС',exact:true}).waitFor()
+ assert.equal(await page.locator('.geo-turbine').count(),2,'Both backend turbine coordinates are listed')
+ assert.equal(await page.locator('.geo-map').evaluate(el=>el.style.height || getComputedStyle(el).minHeight),'560px','Terrain map has a usable desktop height')
+ await page.screenshot({path:'tests/geography-desktop.png',fullPage:true})
  await page.setViewportSize({width:390,height:844})
  await page.evaluate(()=>window.scrollTo(0,0))
  await page.screenshot({path:'tests/result-mobile.png',fullPage:true})

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from .db import ForecastRun, Measurement, SessionLocal, init_db
 from .pipeline import create_forecast
+from .weather import COORDINATES
 
 app = FastAPI(title="Health Core Wind Forecast", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
@@ -43,6 +44,13 @@ class MeasurementInput(BaseModel):
 def health(session: Session = Depends(get_session)) -> dict:
     session.execute(text("SELECT 1"))
     return {"status": "ok", "database": "ready"}
+
+
+@app.get("/turbines")
+def turbines() -> list[dict]:
+    return [{"id": turbine_id, "name": f"Турбина {turbine_id:02d}",
+             "latitude": coordinates[0], "longitude": coordinates[1]}
+            for turbine_id, coordinates in COORDINATES.items()]
 
 
 @app.get("/measurements")
