@@ -1,9 +1,9 @@
 from datetime import date, datetime, timedelta, timezone
+import math
 import os
 
 import httpx
 
-COORDINATES = {1: (43.645150, 78.535604), 2: (43.643198, 78.538828)}
 KAZAKHSTAN_OFFSET = timezone(timedelta(hours=5))
 
 
@@ -17,8 +17,7 @@ def issue_and_weather_run(issue_date: date) -> tuple[datetime, datetime]:
     return issued_at, run_at
 
 
-def fetch_weather(turbine_id: int, run_at: datetime) -> dict[datetime, tuple[float, float]]:
-    latitude, longitude = COORDINATES[turbine_id]
+def fetch_weather(latitude: float, longitude: float, run_at: datetime) -> dict[datetime, tuple[float, float]]:
     params = {
         "latitude": latitude,
         "longitude": longitude,
@@ -37,10 +36,18 @@ def fetch_weather(turbine_id: int, run_at: datetime) -> dict[datetime, tuple[flo
     if data.get("error"):
         raise ValueError(data.get("reason", "Weather provider error"))
     hourly = data["hourly"]
-    return {
-        datetime.fromisoformat(stamp).replace(tzinfo=timezone.utc): (float(wind), float(temp))
-        for stamp, wind, temp in zip(
-            hourly["time"], hourly["wind_speed_100m"], hourly["temperature_2m"], strict=True
-        )
-        if wind is not None and temp is not None
-    }
+    units = data.get("hourly_units", {})
+    if units and (units.get("wind_speed_100m") not in ("m/s", "ms") or
+                  units.get("temperature_2m") != "°C"):
+        raise ValueError("Unexpected weather units")
+    result = {}
+    for stamp, wind, temp in zip(hourly["time"], hourly["wind_speed_100m"],
+                                 hourly["temperature_2m"], strict=True):
+        if wind is None or temp is None:
+            continue
+        valid_at = datetime.fromisoformat(stamp).replace(tzinfo=timezone.utc)
+        wind, temp = float(wind), float(temp)
+        if not math.isfinite(wind) or not math.isfinite(temp) or wind < 0 or valid_at in result:
+            raise ValueError("Invalid archived weather values")
+        result[valid_at] = (wind, temp)
+    return result

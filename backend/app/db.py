@@ -1,8 +1,8 @@
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 from dotenv import load_dotenv
-from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, JSON, String, UniqueConstraint, create_engine, text
+from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, JSON, LargeBinary, String, UniqueConstraint, create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
@@ -40,6 +40,37 @@ class Measurement(Base):
     original: Mapped[dict] = mapped_column(JSON)
 
 
+class Turbine(Base):
+    __tablename__ = "turbines"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    latitude: Mapped[float] = mapped_column(Float)
+    longitude: Mapped[float] = mapped_column(Float)
+    maps_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+
+class ModelRevision(Base):
+    __tablename__ = "model_revisions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    version: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    artifact_path: Mapped[str] = mapped_column(String(500))
+    training_rows: Mapped[int] = mapped_column(Integer)
+    validation_rows: Mapped[int] = mapped_column(Integer)
+    validation_mae: Mapped[float] = mapped_column(Float)
+    training_max_at: Mapped[datetime] = mapped_column(DateTime)
+    turbine_ids: Mapped[list] = mapped_column(JSON)
+
+
+class ModelArtifact(Base):
+    __tablename__ = "model_artifacts"
+
+    revision_id: Mapped[int] = mapped_column(ForeignKey("model_revisions.id"), primary_key=True)
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+
+
 class ForecastRun(Base):
     __tablename__ = "forecast_runs"
 
@@ -74,6 +105,21 @@ def init_db(bind: Engine = engine) -> None:
         if bind.dialect.name == "postgresql":
             # These tables live in Supabase's exposed public schema. No anon or
             # authenticated policies exist: only the backend's DB connection uses them.
-            for table_name in ("measurements", "forecast_runs", "forecast_points"):
-                connection.execute(text(f'ALTER TABLE public."{table_name}" ENABLE ROW LEVEL SECURITY'))
+            for table_name in ("measurements", "forecast_runs", "forecast_points", "turbines", "model_revisions", "model_artifacts"):
+                rls_enabled = connection.scalar(
+                    text("SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass(:table_name)"),
+                    {"table_name": f"public.{table_name}"},
+                )
+                if not rls_enabled:
+                    connection.execute(text(f'ALTER TABLE public."{table_name}" ENABLE ROW LEVEL SECURITY'))
+        for turbine_id, name, latitude, longitude, maps_url in (
+            (1, "Турбина 01", 43.645150, 78.535604, "https://maps.app.goo.gl/iN6svMt69D5qRpFU9"),
+            (2, "Турбина 02", 43.643198, 78.538828, "https://maps.app.goo.gl/8UQMwsYavY6nLvFY8"),
+        ):
+            if connection.scalar(text("SELECT id FROM turbines WHERE id=:id"), {"id": turbine_id}) is None:
+                connection.execute(Turbine.__table__.insert().values(id=turbine_id, name=name,
+                    latitude=latitude, longitude=longitude, maps_url=maps_url))
+        if bind.dialect.name == "postgresql":
+            connection.execute(text("SELECT setval(pg_get_serial_sequence('turbines', 'id'), "
+                                    "GREATEST((SELECT max(id) FROM turbines), 1))"))
         connection.execute(text("SELECT 1"))

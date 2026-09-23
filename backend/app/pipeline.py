@@ -1,8 +1,10 @@
 import csv
 from datetime import date, datetime, timedelta, timezone
-import hashlib
+import io
+import math
 import os
 from pathlib import Path
+from uuid import uuid4
 
 import joblib
 import numpy as np
@@ -14,8 +16,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
-from .db import ForecastPoint, ForecastRun, Measurement
-from .weather import COORDINATES, KAZAKHSTAN_OFFSET, fetch_weather, issue_and_weather_run
+from .db import ForecastPoint, ForecastRun, Measurement, ModelArtifact, ModelRevision, Turbine
+from .weather import KAZAKHSTAN_OFFSET, fetch_weather, issue_and_weather_run
 
 SOURCE_COLUMNS = (
     "ID",
@@ -24,43 +26,75 @@ SOURCE_COLUMNS = (
     "Нормализованная активная мощность",
     "Средняя температура окружающей среды(°C)",
 )
-MODEL_PATH = Path(os.getenv("MODEL_PATH", "./model.joblib"))
+TRAINING_CUTOFF = datetime(2026, 1, 31)
+MODEL_DIR = Path(os.getenv("MODEL_DIR", "./models"))
 
 
-def import_csv(session: Session, path: Path, turbine_id: int) -> int:
-    if turbine_id not in COORDINATES:
+def _parse_csv(handle):
+    reader = csv.DictReader(handle)
+    if tuple(reader.fieldnames or ()) != SOURCE_COLUMNS:
+        raise ValueError("Unexpected CSV columns")
+    for line, row in enumerate(reader, start=2):
+        try:
+            if None in row or any(value is None or not value.strip() for value in row.values()):
+                raise ValueError("Missing or extra CSV field")
+            source_id = int(row[SOURCE_COLUMNS[0]])
+            observed_at = datetime.strptime(row[SOURCE_COLUMNS[1]], "%Y-%m-%d %H:%M:%S")
+            wind = float(row[SOURCE_COLUMNS[2]])
+            power = float(row[SOURCE_COLUMNS[3]])
+            temperature = float(row[SOURCE_COLUMNS[4]])
+            if source_id < 1 or not all(map(math.isfinite, (wind, power, temperature))) or wind < 0 or not 0 <= power <= 1:
+                raise ValueError("Out-of-range or non-finite value")
+        except (ValueError, TypeError) as exc:
+            raise ValueError(f"Invalid CSV row {line}: {exc}") from exc
+        yield {"source_id": source_id, "observed_at": observed_at, "wind_speed_ms": wind,
+               "normalized_power": power, "temperature_c": temperature, "original": row}
+
+
+def import_csv_stream(session: Session, binary_handle, turbine_id: int) -> dict:
+    if session.get(Turbine, turbine_id) is None:
         raise ValueError("Unknown turbine")
     dialect_insert = pg_insert if session.bind.dialect.name == "postgresql" else sqlite_insert
     imported = 0
-    with path.open("r", encoding="utf-8-sig", newline="") as handle:
-        reader = csv.DictReader(handle)
-        if tuple(reader.fieldnames or ()) != SOURCE_COLUMNS:
-            raise ValueError("Unexpected CSV columns")
-        batch = []
-        for row in reader:
-            batch.append({
-                "turbine_id": turbine_id,
-                "source_id": int(row[SOURCE_COLUMNS[0]]),
-                "observed_at": datetime.strptime(row[SOURCE_COLUMNS[1]], "%Y-%m-%d %H:%M:%S"),
-                "wind_speed_ms": float(row[SOURCE_COLUMNS[2]]),
-                "normalized_power": float(row[SOURCE_COLUMNS[3]]),
-                "temperature_c": float(row[SOURCE_COLUMNS[4]]),
-                "original": row,
-            })
-            if len(batch) == 1000:
+    total = 0
+    # Preflight the entire file before writing; malformed rows never produce a partial import.
+    try:
+        handle = io.TextIOWrapper(binary_handle, encoding="utf-8-sig", newline="")
+        try:
+            for _ in _parse_csv(handle):
+                total += 1
+        finally:
+            handle.detach()
+        binary_handle.seek(0)
+        handle = io.TextIOWrapper(binary_handle, encoding="utf-8-sig", newline="")
+        try:
+            batch = []
+            for row in _parse_csv(handle):
+                batch.append({"turbine_id": turbine_id, **row})
+                if len(batch) == 1000:
+                    statement = dialect_insert(Measurement).values(batch).on_conflict_do_nothing(
+                        index_elements=["turbine_id", "source_id"])
+                    imported += session.execute(statement).rowcount
+                    batch = []
+            if batch:
                 statement = dialect_insert(Measurement).values(batch).on_conflict_do_nothing(
-                    index_elements=["turbine_id", "source_id"]
-                )
+                    index_elements=["turbine_id", "source_id"])
                 imported += session.execute(statement).rowcount
-                session.commit()
-                batch = []
-        if batch:
-            statement = dialect_insert(Measurement).values(batch).on_conflict_do_nothing(
-                index_elements=["turbine_id", "source_id"]
-            )
-            imported += session.execute(statement).rowcount
             session.commit()
-    return imported
+        finally:
+            handle.detach()
+    except (UnicodeError, csv.Error) as exc:
+        session.rollback()
+        raise ValueError(f"Invalid CSV encoding or structure: {exc}") from exc
+    except Exception:
+        session.rollback()
+        raise
+    return {"rows": total, "imported": imported, "skipped": total - imported}
+
+
+def import_csv(session: Session, path: Path, turbine_id: int) -> int:
+    with path.open("rb") as handle:
+        return import_csv_stream(session, handle, turbine_id)["imported"]
 
 
 def features(frame: pd.DataFrame) -> np.ndarray:
@@ -77,11 +111,11 @@ def features(frame: pd.DataFrame) -> np.ndarray:
     ))
 
 
-def train_model(session: Session) -> dict:
+def train_model(session: Session, cutoff: datetime = TRAINING_CUTOFF) -> dict:
     rows = session.execute(select(
         Measurement.turbine_id, Measurement.observed_at,
         Measurement.wind_speed_ms, Measurement.temperature_c, Measurement.normalized_power
-    )).all()
+    ).where(Measurement.observed_at < cutoff)).all()
     if len(rows) < 1000:
         raise ValueError("Import at least 1000 measurements before training")
     frame = pd.DataFrame(rows, columns=["turbine_id", "observed_at", "wind_speed_ms", "temperature_c", "normalized_power"])
@@ -96,25 +130,68 @@ def train_model(session: Session) -> dict:
     model.fit(features(train), train["normalized_power"])
     prediction = np.clip(model.predict(features(validation)), 0, 1)
     metric = float(mean_absolute_error(validation["normalized_power"], prediction))
-    version = hashlib.sha256(f"{len(rows)}:{frame['observed_at'].max()}".encode()).hexdigest()[:12]
-    MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump({"model": model, "version": version, "validation_mae": metric}, MODEL_PATH)
-    return {"model_version": version, "hourly_train_rows": len(train), "hourly_validation_rows": len(validation), "validation_mae": metric,
+    version = uuid4().hex[:12]
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    artifact_path = MODEL_DIR / f"model-{version}.joblib"
+    # A turbine present only in the holdout has never been seen by model.fit.
+    turbine_ids = sorted(int(item) for item in train["turbine_id"].unique())
+    joblib.dump({"model": model, "version": version, "validation_mae": metric,
+                "turbine_ids": turbine_ids}, artifact_path)
+    revision = ModelRevision(version=version, artifact_path=str(artifact_path), training_rows=len(train),
+                             validation_rows=len(validation), validation_mae=metric,
+                             training_max_at=frame["observed_at"].max().to_pydatetime(), turbine_ids=turbine_ids)
+    try:
+        session.add(revision)
+        session.flush()
+        session.add(ModelArtifact(revision_id=revision.id, data=artifact_path.read_bytes()))
+        session.commit()
+        session.refresh(revision)
+    except Exception:
+        session.rollback()
+        artifact_path.unlink(missing_ok=True)
+        raise
+    return {"revision_id": revision.id, "model_version": version, "hourly_train_rows": len(train),
+            "hourly_validation_rows": len(validation), "validation_mae": metric,
+            "training_max_at": revision.training_max_at, "turbine_ids": turbine_ids,
             "warning": "Validation uses measured turbine weather; forecast-weather calibration remains to be measured."}
 
 
-def create_forecast(session: Session, issue_date: date) -> ForecastRun:
-    artifact = joblib.load(MODEL_PATH)
+def create_forecast(session: Session, issue_date: date, turbine_ids: list[int] | None = None,
+                    revision_id: int | None = None) -> ForecastRun:
+    revision = (session.get(ModelRevision, revision_id) if revision_id is not None else
+                session.scalar(select(ModelRevision).order_by(ModelRevision.id.desc())))
+    if revision_id is not None and revision is None:
+        raise ValueError("Model revision not found")
+    if revision is None:
+        raise FileNotFoundError("Train a versioned model first")
+    binary = session.get(ModelArtifact, revision.id)
+    if binary is not None:
+        artifact = joblib.load(io.BytesIO(binary.data))
+    else:
+        # Older revisions created before model_artifacts was introduced.
+        artifact = joblib.load(revision.artifact_path)
+    if turbine_ids is None:
+        turbine_ids = list(artifact.get("turbine_ids", [1, 2]))
+    if not turbine_ids or len(turbine_ids) != len(set(turbine_ids)):
+        raise ValueError("Select one or more unique turbines")
+    unsupported = set(turbine_ids) - set(artifact.get("turbine_ids", [1, 2]))
+    if unsupported:
+        raise ValueError(f"Model has no training data for turbines: {sorted(unsupported)}")
+    turbines = session.scalars(select(Turbine).where(Turbine.id.in_(turbine_ids))).all()
+    if len(turbines) != len(turbine_ids):
+        raise ValueError("Unknown turbine")
     issued_at, weather_run_at = issue_and_weather_run(issue_date)
+    if revision is not None and revision.training_max_at >= issued_at.replace(tzinfo=None):
+        raise ValueError("Selected model was trained on measurements unavailable at forecast issue time")
     timeline = [issued_at.astimezone(timezone.utc) + timedelta(hours=offset) for offset in range(1, 49)]
     rows = []
-    for turbine_id in COORDINATES:
-        weather = fetch_weather(turbine_id, weather_run_at)
+    for turbine in turbines:
+        weather = fetch_weather(turbine.latitude, turbine.longitude, weather_run_at)
         for valid_at in timeline:
             if valid_at not in weather:
                 raise ValueError(f"Missing weather for {valid_at.isoformat()}")
             wind, temperature = weather[valid_at]
-            rows.append({"turbine_id": turbine_id,
+            rows.append({"turbine_id": turbine.id,
                          "observed_at": valid_at.astimezone(KAZAKHSTAN_OFFSET).replace(tzinfo=None),
                          "valid_at": valid_at.replace(tzinfo=None),
                          "wind_speed_ms": wind, "temperature_c": temperature})
@@ -124,7 +201,9 @@ def create_forecast(session: Session, issue_date: date) -> ForecastRun:
     run = ForecastRun(issued_at=issued_at.replace(tzinfo=None), weather_run_at=weather_run_at.replace(tzinfo=None),
                       model_version=artifact["version"], status="complete",
                       analysis={"points": len(rows), "min": float(predictions.min()), "max": float(predictions.max()),
-                                "mean": float(predictions.mean()), "source": "Open-Meteo ECMWF IFS single run"})
+                                "mean": float(predictions.mean()), "source": "Open-Meteo ECMWF IFS single run",
+                                "turbine_ids": turbine_ids, "revision_id": revision.id if revision else None,
+                                "coordinates": {str(t.id): [t.latitude, t.longitude] for t in turbines}})
     run.points = [ForecastPoint(turbine_id=int(row["turbine_id"]), valid_at=row["valid_at"],
                                 wind_speed_ms=float(row["wind_speed_ms"]), temperature_c=float(row["temperature_c"]),
                                 normalized_power=float(prediction)) for row, prediction in zip(rows, predictions, strict=True)]
