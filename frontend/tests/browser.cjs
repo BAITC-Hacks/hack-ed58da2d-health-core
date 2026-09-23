@@ -9,12 +9,24 @@ const assert = require('node:assert/strict')
  const run={id:7,issued_at:'2026-01-31T00:00:00',weather_run_at:'2026-01-30T12:00:00',model_version:'TEST-FIXTURE',status:'complete',analysis:{source:'TEST FIXTURE — NOT REAL WEATHER'},points}
  const turbines=[{id:1,name:'Турбина 01',latitude:43.64515,longitude:78.535604},{id:2,name:'Турбина 02',latitude:43.643198,longitude:78.538828}]
  const models=[{id:1,version:'TEST-FIXTURE',validation_mae:.03,training_rows:1000,turbine_ids:[1,2]}]
- let fail=false
+ let fail=false,weatherFail=false
  let requireKey=false
  await page.route('https://maps.googleapis.com/**',route=>{
    const callback=new URL(route.request().url()).searchParams.get('callback')
    assert.equal(callback,'__windSightMapsReady','Map loader waits for the Google Maps callback')
-   route.fulfill({status:200,contentType:'application/javascript',body:`window.google={maps:{MapTypeId:{TERRAIN:'terrain',ROADMAP:'roadmap',SATELLITE:'satellite'},LatLngBounds:class{extend(){}},Map:class{constructor(el,opts){el.dataset.mapReady='true';this.element=el;this.options=opts}fitBounds(){}panTo(){}setZoom(){}},InfoWindow:class{setContent(){}open(){}},importLibrary:async name=>name==='maps'?{Map:window.google.maps.Map,InfoWindow:window.google.maps.InfoWindow,LatLngBounds:window.google.maps.LatLngBounds,MapTypeId:window.google.maps.MapTypeId}:{AdvancedMarkerElement:class{constructor(opts){Object.assign(this,opts)}addEventListener(){}},PinElement:class{constructor(){this.element=document.createElement('div')}}}}};window[${JSON.stringify(callback)}]()`})
+   route.fulfill({status:200,contentType:'application/javascript',body:`window.google={maps:{MapTypeId:{TERRAIN:'terrain',ROADMAP:'roadmap',SATELLITE:'satellite'},LatLngBounds:class{extend(){}},Map:class{constructor(el,opts){el.dataset.mapReady='true';this.element=el;this.options=opts;this.zoom=opts.zoom;this.listeners={};window.__testMap=this}fitBounds(){}panTo(){}getZoom(){return this.zoom}getHeading(){return 0}addListener(name,fn){(this.listeners[name]??=[]).push(fn);return{remove(){}}}setZoom(zoom){this.zoom=zoom;(this.listeners.zoom_changed||[]).forEach(fn=>fn())}},InfoWindow:class{setContent(){}open(){}},importLibrary:async name=>name==='maps'?{Map:window.google.maps.Map,InfoWindow:window.google.maps.InfoWindow,LatLngBounds:window.google.maps.LatLngBounds,MapTypeId:window.google.maps.MapTypeId}:{AdvancedMarkerElement:class{constructor(opts){Object.assign(this,opts);opts.map.element.append(opts.content)}addEventListener(){}},PinElement:class{constructor(){this.element=document.createElement('div')}}}}};window[${JSON.stringify(callback)}]()`})
+ })
+ await page.route('https://single-runs-api.open-meteo.com/**',route=>{
+   const url=new URL(route.request().url())
+   assert.equal(url.searchParams.get('models'),'ecmwf_ifs')
+   assert.equal(url.searchParams.get('hourly'),'wind_speed_100m,wind_direction_100m')
+   const start=Date.parse(url.searchParams.get('run')+'Z')
+   const payload={hourly_units:{wind_speed_100m:'m/s',wind_direction_100m:'°'},hourly:{
+     time:Array.from({length:96},(_,i)=>new Date(start+i*3600000).toISOString().slice(0,16)),
+     wind_speed_100m:Array.from({length:96},(_,i)=>5+i/10),
+     wind_direction_100m:Array(96).fill(90)
+   }}
+   route.fulfill({status:weatherFail?503:200,contentType:'application/json',body:JSON.stringify(weatherFail?{error:true,reason:'Fixture outage'}:payload)})
  })
  await page.route('http://127.0.0.1:8000/**',route=>{
    const path=new URL(route.request().url()).pathname
@@ -81,6 +93,30 @@ const assert = require('node:assert/strict')
  await page.getByRole('button',{name:'География ВЭС',exact:true}).click()
  await page.getByRole('heading',{name:'География ВЭС',exact:true,level:1}).waitFor()
  assert.equal(await page.locator('.geo-turbine').count(),2,'Both backend turbine coordinates are listed')
+ await page.locator('.geo-wind-badge:not([hidden])').first().waitFor()
+ assert.equal(await page.locator('.geo-wind-badge:not([hidden])').count(),2,'Wind vectors appear at both turbines')
+ assert.match(await page.locator('.geo-wind-badge').first().innerText(),/5,8 м\/с/)
+ assert.equal(await page.locator('.geo-wind-arrow').first().evaluate(el=>el.style.transform),'rotate(270deg)','A wind from east flows west')
+ await page.evaluate(()=>window.__testMap.setZoom(14))
+ assert.equal(await page.locator('.geo-wind-badge').nth(1).evaluate(el=>el.style.bottom),'-47px','Labels separate at low zoom')
+ await page.evaluate(()=>window.__testMap.setZoom(17))
+ assert.equal(await page.locator('.geo-wind-badge').nth(1).evaluate(el=>el.style.bottom),'52px','Labels return near turbine pins on zoom in')
+ await page.locator('.geo-wind-timeline input').evaluate(el=>{el.value='2';el.dispatchEvent(new Event('input',{bubbles:true}))})
+ assert.match(await page.locator('.geo-wind-badge').first().innerText(),/5,9 м\/с/,'Time slider updates the map data')
+ await page.getByRole('button',{name:'Слой ветра: включён'}).click()
+ assert.equal(await page.locator('.geo-wind-badge:not([hidden])').count(),0,'Layer can be hidden')
+ await page.getByRole('button',{name:'Слой ветра: выключен'}).click()
+ assert.equal(await page.locator('.geo-wind-badge:not([hidden])').count(),2,'Layer can be restored')
+ await page.locator('.geo-wind-date input').fill('2026-02-01')
+ await page.getByText(/Выпуск погоды: 2026-01-31 12:00 UTC/).waitFor()
+ await page.locator('.geo-wind-badge:not([hidden])').first().waitFor()
+ weatherFail=true
+ await page.locator('.geo-wind-date input').fill('2026-02-02')
+ await page.getByRole('alert').filter({hasText:'Слой ветра недоступен'}).waitFor()
+ assert.equal(await page.locator('.geo-turbine').count(),2,'Weather outage does not hide the map or turbines')
+ weatherFail=false
+ await page.getByRole('button',{name:'Повторить'}).click()
+ await page.locator('.geo-wind-badge:not([hidden])').first().waitFor()
  assert.equal(await page.locator('.geo-map').getAttribute('data-map-ready'),'true','Map initializes after the API callback')
  assert.equal(await page.getByRole('alert').count(),0,'Geography does not report a loader error')
  assert.equal(await page.locator('.geo-map').evaluate(el=>el.style.height || getComputedStyle(el).minHeight),'560px','Terrain map has a usable desktop height')
@@ -109,5 +145,5 @@ const assert = require('node:assert/strict')
  fail=true;await page.getByRole('button',{name:/Запустить агента/}).click();await page.getByRole('alert').filter({hasText:'Сначала обучите модель'}).waitFor()
  assert.equal(await page.locator('tbody tr').count(),48,'Error preserves last result')
  assert.deepEqual(errors,[])
- await browser.close();console.log('PASS: forecast flows, navigation, Geography map shell/turbine list, horizons, export, provenance, lookup, mobile, server error; synthetic API only.')
+ await browser.close();console.log('PASS: forecast flows, wind overlay/time/zoom/date controls, navigation, export, provenance, lookup, mobile, server error; synthetic API only.')
 })().catch(e=>{console.error(e);process.exit(1)})

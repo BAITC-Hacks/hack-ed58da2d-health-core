@@ -150,8 +150,35 @@ footer span:first-child { margin-right: auto; }
 .geo-intro h2 { font-size: 22px; }
 .geo-intro p:not(.eyebrow) { margin: 5px 0 0; color: var(--muted); font-size: 15px; }
 .geo-provider { flex-shrink: 0; padding: 8px 11px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: #365f49; font-size: 14px; }
+.geo-wind-panel { display: grid; gap: 11px; margin-bottom: 14px; padding: 14px 18px; }
+.geo-wind-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; }
+.geo-wind-head > div { display: grid; gap: 2px; }
+.geo-wind-head strong { font-size: 17px; }
+.geo-wind-head span { color: var(--muted); font-size: 13px; }
+.geo-wind-toggle, .geo-wind-play { min-height: 38px; padding: 8px 12px; border-radius: 8px; font-weight: 650; }
+.geo-wind-toggle { background: #e5f4ed; color: #075c4d; }
+.geo-wind-toggle[aria-pressed="false"] { background: #eef1ef; color: #4d6258; }
+.geo-wind-play { background: #116e60; color: #fff; white-space: nowrap; }
+.geo-wind-tools { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 18px; }
+.geo-wind-date, .geo-wind-timeline { display: grid; gap: 4px; color: #3c5749; font-size: 13px; font-weight: 650; }
+.geo-wind-date input { width: 170px; min-height: 38px; padding: 6px 9px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: #203431; }
+.geo-wind-timeline { flex: 1 1 270px; }
+.geo-wind-timeline strong { color: #203431; font-size: 14px; font-variant-numeric: tabular-nums; }
+.geo-wind-timeline input { width: 100%; margin: 7px 0 6px; accent-color: #117762; }
+.geo-wind-legend, .geo-wind-status { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.geo-wind-status { display: flex; align-items: center; gap: 8px; }
+.geo-wind-error { flex-wrap: wrap; color: #a1372b; }
+.geo-wind-error button { padding: 5px 9px; border-radius: 6px; background: #fff1ed; color: #8f3429; font-size: 13px; font-weight: 700; }
 .geo-layout { display: grid; grid-template-columns: minmax(0,1fr) 300px; gap: 14px; align-items: stretch; }
 .geo-map { min-height: 560px; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; background: #e9efed; }
+.geo-marker { position: relative; display: flex; justify-content: center; overflow: visible; }
+.geo-wind-badge { --wind-color: #117762; position: absolute; bottom: 52px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 5px; min-width: 118px; padding: 5px 7px; border: 2px solid #fff; border-radius: 22px; background: #f9fffc; box-shadow: 0 3px 14px #142b2799; color: #17352e; white-space: nowrap; pointer-events: none; }
+.geo-wind-badge[hidden] { display: none; }
+.geo-wind-badge[data-band="medium"] { --wind-color: #156da8; }
+.geo-wind-badge[data-band="high"] { --wind-color: #af5925; }
+.geo-wind-number { color: #4f695c; font-size: 11px; font-weight: 800; }
+.geo-wind-arrow { display: grid; place-items: center; width: 25px; height: 25px; flex: 0 0 25px; border-radius: 50%; background: var(--wind-color); color: #fff; font-size: 20px; font-weight: 800; line-height: 1; transition: transform .25s ease; }
+.geo-wind-speed { color: #18342d; font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .geo-list { padding: 18px; }
 .geo-list h3 { margin: 0; }
 .geo-hint { margin: 6px 0 14px; color: var(--muted); font-size: 14px; line-height: 1.45; }
@@ -162,6 +189,7 @@ footer span:first-child { margin-right: auto; }
 .geo-turbine-copy { display: grid; gap: 3px; min-width: 0; flex: 1; }
 .geo-turbine-copy strong { font-size: 15px; }
 .geo-turbine-copy small { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.geo-turbine-copy .geo-turbine-wind { color: #096953; font-size: 13px; font-weight: 700; }
 .geo-attribution { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid #e7eee9; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .geo-info { display: grid; gap: 4px; padding: 3px; color: #203431; }
 .geo-info strong { font-size: 15px; }
@@ -238,6 +266,10 @@ footer span:first-child { margin-right: auto; }
   .chart-scrubber { flex-wrap: wrap; }
   .empty-chart { min-height: 230px; }
   .geo-intro { align-items: flex-start; flex-direction: column; }
+  .geo-wind-panel { padding: 12px; }
+  .geo-wind-tools { align-items: stretch; }
+  .geo-wind-date input { width: 100%; }
+  .geo-wind-play { width: 100%; }
   .geo-map { min-height: 390px; }
   footer span:first-child { display: none; }
 }
