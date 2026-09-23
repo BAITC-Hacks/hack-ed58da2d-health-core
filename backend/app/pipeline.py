@@ -133,7 +133,8 @@ def train_model(session: Session, cutoff: datetime = TRAINING_CUTOFF) -> dict:
     version = uuid4().hex[:12]
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     artifact_path = MODEL_DIR / f"model-{version}.joblib"
-    turbine_ids = sorted(int(item) for item in frame["turbine_id"].unique())
+    # A turbine present only in the holdout has never been seen by model.fit.
+    turbine_ids = sorted(int(item) for item in train["turbine_id"].unique())
     joblib.dump({"model": model, "version": version, "validation_mae": metric,
                 "turbine_ids": turbine_ids}, artifact_path)
     revision = ModelRevision(version=version, artifact_path=str(artifact_path), training_rows=len(train),

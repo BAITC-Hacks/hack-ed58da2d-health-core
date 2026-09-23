@@ -19,3 +19,15 @@ test('missing hours, duplicates and invalid powers are flagged',()=>{
  assert.ok(validatePoints(points.slice(1),48,'2026-01-31T00:00:00').length>=2)
  assert.ok(validatePoints([{...points[0],normalized_power:2},points[0]],2,'2026-01-31T00:00:00').length>=2)
 })
+test('dashboard indicators use the selected points without extra aggregation',()=>{
+ const sample=[
+  {valid_at:'2026-01-31T01:00:00Z',normalized_power:.2,wind_speed_ms:4},
+  {valid_at:'2026-01-31T02:00:00Z',normalized_power:.8,wind_speed_ms:8},
+  {valid_at:'2026-01-31T03:00:00Z',normalized_power:.8,wind_speed_ms:6}
+ ]
+ const stats=summarize(sample)
+ assert.equal(stats.mean,.6)
+ assert.equal(stats.wind,6)
+ assert.equal(stats.peak,sample[2],'The last tied maximum is shown')
+ assert.equal(stats.low,sample[0])
+})

@@ -75,6 +75,15 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(run.model_version, second["model_version"])
         with self.assertRaisesRegex(ValueError, "unavailable at forecast issue time"):
             create_forecast(self.session, date(2026, 1, 10), [1], second["revision_id"])
+        self.session.add(Turbine(id=3, name="Late turbine", latitude=43.7, longitude=78.6))
+        self.session.add_all(Measurement(turbine_id=3, source_id=i + 1,
+                                         observed_at=datetime(2026, 1, 25) + timedelta(hours=i),
+                                         wind_speed_ms=7, normalized_power=.5, temperature_c=5,
+                                         original={}) for i in range(10))
+        self.session.commit()
+        with patch("backend.app.pipeline.MODEL_DIR", Path(self.temp.name)):
+            third = train_model(self.session)
+        self.assertEqual(third["turbine_ids"], [1], "A turbine only in holdout must not be forecastable")
 
     def test_weather_run_precedes_decision(self):
         issued, weather_run = issue_and_weather_run(date(2026, 2, 1))
