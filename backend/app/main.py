@@ -8,7 +8,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
-from .db import ForecastPoint, ForecastRun, Measurement, ModelRevision, SessionLocal, Turbine, init_db
+from .bootstrap import bootstrap
+from .db import ForecastPoint, ForecastRun, Measurement, ModelRevision, SessionLocal, Turbine, engine, init_db
 from .pipeline import create_forecast, import_csv_stream, train_model
 from .turbines import coordinates_from_maps_url
 
@@ -21,12 +22,15 @@ app.add_middleware(CORSMiddleware, allow_origins=["http://127.0.0.1:5173", "http
 def startup() -> None:
     if os.getenv("APP_ENV") == "production" and not os.getenv("API_WRITE_KEY"):
         raise RuntimeError("API_WRITE_KEY is required in production")
+    if os.getenv("APP_ENV") == "production" and engine.dialect.name != "postgresql":
+        raise RuntimeError("PostgreSQL DATABASE_URL is required in production")
     if os.getenv('DB_INIT_ON_STARTUP', 'true').lower() in ('1', 'true', 'yes'):
         init_db()
     else:
         # An existing shared database must not take DDL locks on every API start.
         with SessionLocal() as session:
             session.execute(text('SELECT 1'))
+    bootstrap.start()
 
 
 def get_session():
@@ -70,6 +74,11 @@ class TrainInput(BaseModel):
 def health(session: Session = Depends(get_session)) -> dict:
     session.execute(text("SELECT 1"))
     return {"status": "ok", "database": "ready", "database_backend": session.get_bind().dialect.name}
+
+
+@app.get("/readiness")
+def readiness(session: Session = Depends(get_session)) -> dict:
+    return bootstrap.snapshot(session)
 
 
 @app.get("/turbines")
@@ -151,10 +160,18 @@ def train(options: TrainInput | None = None, session: Session = Depends(get_sess
     cutoff_date = options.cutoff_date if options else date(2026, 1, 31)
     if cutoff_date > date(2026, 2, 1):
         raise HTTPException(status_code=422, detail="Training cutoff cannot enter the February test period")
+    if not bootstrap.begin_training():
+        raise HTTPException(status_code=409, detail="Data import or model training is already in progress")
     try:
-        return train_model(session, datetime.combine(cutoff_date, time.min))
+        result = train_model(session, datetime.combine(cutoff_date, time.min))
+        bootstrap.finish_training()
+        return result
     except ValueError as exc:
+        bootstrap.finish_training(str(exc))
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception:
+        bootstrap.finish_training("Смотрите журнал backend")
+        raise
 
 
 @app.post("/forecasts/{issue_date}", status_code=201, dependencies=[Depends(require_write_key)])
@@ -164,8 +181,8 @@ def forecast(issue_date: date, options: ForecastInput | None = None,
         run = create_forecast(session, issue_date,
                               options.turbine_ids if options else None,
                               options.revision_id if options else None)
-    except FileNotFoundError:
-        raise HTTPException(status_code=409, detail="Train the model first") from None
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {"id": run.id, "status": run.status, "analysis": run.analysis}

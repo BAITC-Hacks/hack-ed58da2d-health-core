@@ -158,12 +158,15 @@ def train_model(session: Session, cutoff: datetime = TRAINING_CUTOFF) -> dict:
 
 def create_forecast(session: Session, issue_date: date, turbine_ids: list[int] | None = None,
                     revision_id: int | None = None) -> ForecastRun:
+    issued_at, weather_run_at = issue_and_weather_run(issue_date)
     revision = (session.get(ModelRevision, revision_id) if revision_id is not None else
-                session.scalar(select(ModelRevision).order_by(ModelRevision.id.desc())))
+                session.scalar(select(ModelRevision)
+                               .where(ModelRevision.training_max_at < issued_at.replace(tzinfo=None))
+                               .order_by(ModelRevision.id.desc())))
     if revision_id is not None and revision is None:
         raise ValueError("Model revision not found")
     if revision is None:
-        raise FileNotFoundError("Train a versioned model first")
+        raise FileNotFoundError("No model revision is available before the forecast issue time")
     binary = session.get(ModelArtifact, revision.id)
     if binary is not None:
         artifact = joblib.load(io.BytesIO(binary.data))
@@ -180,7 +183,6 @@ def create_forecast(session: Session, issue_date: date, turbine_ids: list[int] |
     turbines = session.scalars(select(Turbine).where(Turbine.id.in_(turbine_ids))).all()
     if len(turbines) != len(turbine_ids):
         raise ValueError("Unknown turbine")
-    issued_at, weather_run_at = issue_and_weather_run(issue_date)
     if revision is not None and revision.training_max_at >= issued_at.replace(tzinfo=None):
         raise ValueError("Selected model was trained on measurements unavailable at forecast issue time")
     timeline = [issued_at.astimezone(timezone.utc) + timedelta(hours=offset) for offset in range(1, 49)]

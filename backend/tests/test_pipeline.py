@@ -63,13 +63,21 @@ class PipelineTests(unittest.TestCase):
         self.assertLess(first["training_max_at"], datetime(2026, 2, 1))
         self.assertEqual(self.session.scalar(select(func.count()).select_from(ModelRevision)), 2)
         self.assertEqual(self.session.scalar(select(func.count()).select_from(ModelArtifact)), 2)
+        future_revision = ModelRevision(version="future-test", artifact_path="missing.joblib",
+                                        training_rows=1000, validation_rows=100, validation_mae=.01,
+                                        training_max_at=datetime(2026, 1, 31, 23), turbine_ids=[1])
+        self.session.add(future_revision)
+        self.session.flush()
+        self.session.add(ModelArtifact(revision_id=future_revision.id,
+                                       data=self.session.get(ModelArtifact, second["revision_id"]).data))
+        self.session.commit()
         for artifact in Path(self.temp.name).glob("*.joblib"):
             artifact.unlink()
         issued, _ = issue_and_weather_run(date(2026, 1, 31))
         weather = {issued.astimezone(timezone.utc) + timedelta(hours=i): (8.0, 5.0)
                    for i in range(1, 49)}
         with patch("backend.app.pipeline.fetch_weather", return_value=weather):
-            run = create_forecast(self.session, date(2026, 1, 31), [1], second["revision_id"])
+            run = create_forecast(self.session, date(2026, 1, 31), [1])
         self.assertEqual(len(run.points), 48)
         self.assertEqual({point.turbine_id for point in run.points}, {1})
         self.assertEqual(run.model_version, second["model_version"])

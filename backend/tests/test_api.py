@@ -57,6 +57,9 @@ class ApiTests(unittest.TestCase):
 
     def test_operator_key_protects_writes_without_blocking_reads(self):
         self.assertEqual(self.client.get('/forecasts').json(), [])
+        readiness = self.client.get('/readiness')
+        self.assertEqual(readiness.status_code, 200)
+        self.assertFalse(readiness.json()['can_forecast'])
         with patch.dict("os.environ", {"API_WRITE_KEY": "test-operator-secret"}):
             self.assertEqual(self.client.get("/turbines").status_code, 200)
             body = {"name": "Турбина 03", "latitude": 43.7, "longitude": 78.6}
