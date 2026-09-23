@@ -38,6 +38,9 @@ const assert = require('node:assert/strict')
  })
  await page.goto('http://127.0.0.1:5173')
  await page.getByText('Прогноз доступен',{exact:true}).waitFor()
+ assert.deepEqual(await page.locator('#workspace-nav button').evaluateAll(buttons=>buttons.map(button=>button.getAttribute('aria-label'))),[
+   'Обзор прогноза','Данные и модели','География ВЭС','Источники данных','История расчётов'
+ ])
  availability={status:'training',can_forecast:false,message:'Модель в процессе обучения.',supported_turbine_ids:[]}
  await page.reload()
  await page.getByText('Модель в процессе обучения.',{exact:true}).waitFor()
