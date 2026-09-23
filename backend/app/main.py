@@ -3,7 +3,7 @@ from datetime import date, datetime
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from .db import ForecastRun, Measurement, SessionLocal, init_db
@@ -34,8 +34,9 @@ class MeasurementInput(BaseModel):
 
 
 @app.get("/health")
-def health() -> dict:
-    return {"status": "ok"}
+def health(session: Session = Depends(get_session)) -> dict:
+    session.execute(text("SELECT 1"))
+    return {"status": "ok", "database": "ready"}
 
 
 @app.get("/measurements")

@@ -2,15 +2,19 @@ import os
 from datetime import datetime
 
 from dotenv import load_dotenv
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, JSON, String, UniqueConstraint, create_engine
+from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, JSON, String, UniqueConstraint, create_engine, text
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
 load_dotenv()
 
 database_url = os.getenv("DATABASE_URL", "sqlite:///./healthcore.sqlite3")
+if database_url.startswith("postgresql://"):
+    database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
 engine = create_engine(
     database_url,
     connect_args={"check_same_thread": False} if database_url.startswith("sqlite") else {},
+    **({"pool_pre_ping": True, "pool_size": 5, "max_overflow": 2} if database_url.startswith("postgresql") else {}),
 )
 SessionLocal = sessionmaker(bind=engine)
 
@@ -21,7 +25,10 @@ class Base(DeclarativeBase):
 
 class Measurement(Base):
     __tablename__ = "measurements"
-    __table_args__ = (UniqueConstraint("turbine_id", "source_id"),)
+    __table_args__ = (
+        UniqueConstraint("turbine_id", "source_id"),
+        Index("ix_measurements_turbine_observed", "turbine_id", "observed_at"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     turbine_id: Mapped[int] = mapped_column(Integer, index=True)
@@ -57,5 +64,16 @@ class ForecastPoint(Base):
     normalized_power: Mapped[float] = mapped_column(Float)
 
 
-def init_db() -> None:
-    Base.metadata.create_all(engine)
+def init_db(bind: Engine = engine) -> None:
+    """Create the initial schema idempotently; block Data API access on PostgreSQL."""
+    with bind.begin() as connection:
+        Base.metadata.create_all(connection)
+        # create_all does not add indexes to tables created by older versions.
+        for index in Measurement.__table__.indexes:
+            index.create(connection, checkfirst=True)
+        if bind.dialect.name == "postgresql":
+            # These tables live in Supabase's exposed public schema. No anon or
+            # authenticated policies exist: only the backend's DB connection uses them.
+            for table_name in ("measurements", "forecast_runs", "forecast_points"):
+                connection.execute(text(f'ALTER TABLE public."{table_name}" ENABLE ROW LEVEL SECURITY'))
+        connection.execute(text("SELECT 1"))
