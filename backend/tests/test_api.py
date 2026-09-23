@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -48,6 +49,16 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(rows[0]["original"][SOURCE_COLUMNS[2]], "6.73")
         self.assertEqual(self.client.post("/models/train").status_code, 422)
         self.assertEqual(self.client.post("/models/train", json={"cutoff_date": "2026-02-02"}).status_code, 422)
+
+    def test_operator_key_protects_writes_without_blocking_reads(self):
+        with patch.dict("os.environ", {"API_WRITE_KEY": "test-operator-secret"}):
+            self.assertEqual(self.client.get("/turbines").status_code, 200)
+            body = {"name": "Турбина 03", "latitude": 43.7, "longitude": 78.6}
+            self.assertEqual(self.client.post("/turbines", json=body).status_code, 401)
+            self.assertEqual(self.client.post("/turbines", json=body,
+                                              headers={"X-Admin-Key": "wrong"}).status_code, 401)
+            self.assertEqual(self.client.post("/turbines", json=body,
+                                              headers={"X-Admin-Key": "test-operator-secret"}).status_code, 201)
 
 
 if __name__ == "__main__":

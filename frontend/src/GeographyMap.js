@@ -59,15 +59,14 @@ export default {
 
     onMounted(async () => {
       const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-      if (!key) {
-        error.value = 'Не найден VITE_GOOGLE_MAPS_API_KEY. Проверьте корневой .env и перезапустите Vite.'
-        loading.value = false
-        return
-      }
       try {
         const rows = await request('/turbines')
         if (!Array.isArray(rows) || !rows.length) throw new Error('Backend не вернул координаты турбин.')
         turbines.value = rows
+        if (!key) {
+          error.value = 'Ключ Google Maps не настроен; координаты турбин доступны в списке и по ссылке ниже.'
+          return
+        }
         const maps = await loadGoogleMaps(key)
         if (!maps) throw new Error('Google Maps не инициализировалась. Проверьте Maps JavaScript API для Demo Key.')
         const [{ Map, InfoWindow }, { AdvancedMarkerElement, PinElement }] = await Promise.all([
@@ -135,13 +134,14 @@ export default {
       <div v-if="error" class="notice error" role="alert">{{error}}</div>
       <div v-else-if="loading" class="notice" role="status"><span class="spinner"></span> Загружаем координаты и карту…</div>
       <div class="geo-layout">
-        <div ref="mapElement" class="geo-map" role="region" aria-label="Карта расположения турбин"></div>
+        <div ref="mapElement" class="geo-map" role="region" aria-label="Карта расположения турбин"><span v-if="!loading && error">Карта недоступна. Координаты и ссылки на объекты — справа.</span></div>
         <aside class="geo-list panel">
           <h3>Турбины</h3>
           <p class="geo-hint">Выберите объект, чтобы приблизить карту.</p>
           <button v-for="turbine in turbines" :key="turbine.id" class="geo-turbine" @click="focusTurbine(turbine)">
             <span class="geo-pin">{{turbine.id}}</span><span class="geo-turbine-copy"><strong>{{turbine.name}}</strong><small>{{turbine.latitude.toFixed(6)}}, {{turbine.longitude.toFixed(6)}}</small></span><span aria-hidden="true">↗</span>
           </button>
+          <a v-for="turbine in turbines" :key="'link-'+turbine.id" :href="'https://www.google.com/maps/search/?api=1&query='+turbine.latitude+','+turbine.longitude" target="_blank" rel="noopener noreferrer">Открыть {{turbine.name}} в Google Maps</a>
           <p class="geo-attribution">Подложка и управление картой предоставлены Google Maps. Внешняя карта не изменяет и не подменяет данные прогноза ВЭС.</p>
         </aside>
       </div>

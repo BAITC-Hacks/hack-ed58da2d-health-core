@@ -1,7 +1,8 @@
 from datetime import date, datetime, time
 import os
+import secrets
 
-from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import select, text
@@ -13,7 +14,7 @@ from .turbines import coordinates_from_maps_url
 
 app = FastAPI(title="Health Core Wind Forecast", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
-                   allow_methods=["GET", "POST"], allow_headers=["Content-Type"])
+                   allow_methods=["GET", "POST"], allow_headers=["Content-Type", "X-Admin-Key"])
 
 
 @app.on_event("startup")
@@ -29,6 +30,13 @@ def startup() -> None:
 def get_session():
     with SessionLocal() as session:
         yield session
+
+
+def require_write_key(x_admin_key: str | None = Header(default=None)) -> None:
+    """Keep public reads available while protecting all production writes."""
+    expected = os.getenv("API_WRITE_KEY")
+    if expected and (x_admin_key is None or not secrets.compare_digest(x_admin_key, expected)):
+        raise HTTPException(status_code=401, detail="Operator key required for this action")
 
 
 class MeasurementInput(BaseModel):
@@ -68,7 +76,7 @@ def turbines(session: Session = Depends(get_session)) -> list[dict]:
              "maps_url": t.maps_url} for t in session.scalars(select(Turbine).order_by(Turbine.id))]
 
 
-@app.post("/turbines", status_code=201)
+@app.post("/turbines", status_code=201, dependencies=[Depends(require_write_key)])
 def add_turbine(item: TurbineInput, session: Session = Depends(get_session)) -> dict:
     if (item.latitude is None) != (item.longitude is None):
         raise HTTPException(status_code=422, detail="Enter both latitude and longitude")
@@ -100,7 +108,7 @@ def measurements(turbine_id: int = Query(ge=1), limit: int = Query(default=100, 
              "original": row.original} for row in rows]
 
 
-@app.post("/measurements", status_code=201)
+@app.post("/measurements", status_code=201, dependencies=[Depends(require_write_key)])
 def add_measurement(item: MeasurementInput, session: Session = Depends(get_session)) -> dict:
     if session.get(Turbine, item.turbine_id) is None:
         raise HTTPException(status_code=422, detail="Unknown turbine")
@@ -114,7 +122,7 @@ def add_measurement(item: MeasurementInput, session: Session = Depends(get_sessi
     return {"id": row.id}
 
 
-@app.post("/measurements/upload", status_code=201)
+@app.post("/measurements/upload", status_code=201, dependencies=[Depends(require_write_key)])
 def upload_measurements(turbine_id: int = Query(ge=1), file: UploadFile = File(...),
                         session: Session = Depends(get_session)) -> dict:
     if not file.filename or not file.filename.lower().endswith(".csv"):
@@ -136,7 +144,7 @@ def models(session: Session = Depends(get_session)) -> list[dict]:
                  select(ModelRevision).order_by(ModelRevision.id.desc()))]
 
 
-@app.post("/models/train", status_code=201)
+@app.post("/models/train", status_code=201, dependencies=[Depends(require_write_key)])
 def train(options: TrainInput | None = None, session: Session = Depends(get_session)) -> dict:
     cutoff_date = options.cutoff_date if options else date(2026, 1, 31)
     if cutoff_date > date(2026, 2, 1):
@@ -147,7 +155,7 @@ def train(options: TrainInput | None = None, session: Session = Depends(get_sess
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@app.post("/forecasts/{issue_date}", status_code=201)
+@app.post("/forecasts/{issue_date}", status_code=201, dependencies=[Depends(require_write_key)])
 def forecast(issue_date: date, options: ForecastInput | None = None,
              session: Session = Depends(get_session)) -> dict:
     try:

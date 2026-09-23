@@ -1,11 +1,16 @@
 const base = (import.meta.env?.VITE_API_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
 export async function request(path, options = {}) {
   let response
-  try { response = await fetch(base + path, { ...options, signal: AbortSignal.timeout(options.method === 'POST' ? 300000 : 15000) }) }
+  const headers = new Headers(options.headers || {})
+  if (options.method === 'POST') {
+    const key = globalThis.sessionStorage?.getItem('healthcore-operator-key')
+    if (key) headers.set('X-Admin-Key', key)
+  }
+  try { response = await fetch(base + path, { ...options, headers, signal: AbortSignal.timeout(options.method === 'POST' ? 300000 : 15000) }) }
   catch { throw new Error('API не ответил. Проверьте сервер. Запущенный расчёт может продолжаться на сервере; проверьте его перед повтором.') }
   let data
   try { data = await response.json() } catch { throw new Error('API вернул ответ в неподдерживаемом формате.') }
-  if (!response.ok) { const detail = data.detail || data.error?.message; throw new Error(detail === 'Train the model first' ? 'Сначала обучите модель на сервере.' : typeof detail === 'string' ? detail : `Ошибка API (${response.status}). Проверьте параметры запроса.`) }
+  if (!response.ok) { const detail = data.detail || data.error?.message; throw new Error(response.status === 401 ? 'Для записи нужен ключ оператора. Введите его в верхней панели.' : detail === 'Train the model first' ? 'Сначала обучите модель на сервере.' : typeof detail === 'string' ? detail : `Ошибка API (${response.status}). Проверьте параметры запроса.`) }
   return data
 }
 // Backend contract: naive valid_at/weather_run_at are UTC; naive issued_at is UTC+5.
