@@ -78,13 +78,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, default=ROOT / "healthcore.sqlite3")
     parser.add_argument("--batch-size", type=int, default=1000)
+    parser.add_argument("--check", action="store_true", help="Read-only destination connectivity and row counts")
     args = parser.parse_args()
     load_dotenv(ROOT / ".env")
-    target_url = os.getenv("SUPABASE_DATABASE_URL")
+    target_url = os.getenv("SUPABASE_DATABASE_URL") or os.getenv("DATABASE_URL")
     if not target_url:
-        parser.error("Set SUPABASE_DATABASE_URL in the ignored .env file first")
-    if make_url(target_url).get_backend_name() != "postgresql":
-        parser.error("SUPABASE_DATABASE_URL must point to PostgreSQL")
+        parser.error("Set SUPABASE_DATABASE_URL or DATABASE_URL in the ignored .env file first")
+    parsed_target = make_url(target_url)
+    if parsed_target.get_backend_name() != "postgresql":
+        parser.error("The target URL must point to PostgreSQL")
+    if not parsed_target.host or parsed_target.host.startswith("@"):
+        parser.error("Malformed database host: remove extra @ or URL-encode @ in the password as %40")
     if not args.source.is_file():
         parser.error(f"SQLite source not found: {args.source}")
 
@@ -93,6 +97,14 @@ def main() -> None:
         target_url = target_url.replace("postgresql://", "postgresql+psycopg://", 1)
     destination = create_engine(target_url, pool_pre_ping=True, pool_size=2, max_overflow=0)
     try:
+        if args.check:
+            with destination.connect() as connection:
+                print(f"Connected to PostgreSQL database: {connection.scalar(text('SELECT current_database()'))}")
+                inspector = inspect(connection)
+                for table in TABLES:
+                    count = summary(connection, table)[0] if inspector.has_table(table.name) else 0
+                    print(f"{table.name}: {count} existing rows")
+            return
         counts = migrate(source, destination, args.batch_size)
         print(f"Migration verified: {counts}")
     finally:

@@ -92,7 +92,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/forecasts/2026-01-31
 
 Supabase-проект и сама база `postgres` создаются в кабинете Supabase; приложение не создаёт облачный проект. В существующей базе оно автоматически создаёт таблицы `measurements`, `forecast_runs`, `forecast_points`, ограничения и индексы. В PostgreSQL для этих таблиц включается RLS без политик для `anon`/`authenticated`: фронтенд работает только через backend, прямой доступ через Supabase Data API закрыт. Если одноимённые таблицы уже созданы вручную, проверьте их структуру: bootstrap не перезаписывает существующие столбцы.
 
-В локальном `.env` рядом с `.env.example` укажите `DATABASE_URL`. Файл `.env` игнорируется Git. В панели Supabase откройте **Connect → Connection string** и выберите Direct connection для ПК/постоянного сервера с IPv6 либо Session pooler для IPv4. Замените схему URL `postgresql://` на `postgresql+psycopg://` (приложение также делает это автоматически). Пример без реальных реквизитов:
+В локальном `.env` рядом с `.env.example` укажите `DATABASE_URL`. Файл `.env` игнорируется Git. В панели Supabase откройте **Connect → Connection string** и выберите Direct connection для ПК/постоянного сервера с работающим IPv6 либо Session pooler (порт 5432) для IPv4. Если Direct-хост `db.<project-ref>.supabase.co` не подключается на ПК без IPv6, используйте Session pooler, не Transaction pooler на порту 6543. Замените схему URL `postgresql://` на `postgresql+psycopg://` (приложение также делает это автоматически). Пример без реальных реквизитов:
 
 ```text
 DATABASE_URL=postgresql+psycopg://USER:URL_ENCODED_PASSWORD@HOST:5432/postgres?sslmode=require
@@ -108,7 +108,7 @@ DATABASE_URL=postgresql+psycopg://USER:URL_ENCODED_PASSWORD@HOST:5432/postgres?s
 Copy-Item .\healthcore.sqlite3 .\healthcore-before-supabase.sqlite3
 ```
 
-В `.env` добавьте `SUPABASE_DATABASE_URL=postgresql+psycopg://...` — полный URL из **Connect → Connection string** в Supabase. Эта переменная имеет приоритет над `DATABASE_URL`, поэтому после успешного переноса и перезапуска backend приложение будет читать PostgreSQL. Не добавляйте URL в код, README или чат. Используйте роль с правами на создание таблиц и запись; целевые таблицы `measurements`, `forecast_runs`, `forecast_points` должны быть пустыми. Скрипт не смешивает данные с существующими строками и не удаляет их.
+В `.env` добавьте `SUPABASE_DATABASE_URL=postgresql+psycopg://...` **или** замените существующий `DATABASE_URL` на полный URL из **Connect → Connection string** в Supabase. Если заданы обе переменные, `SUPABASE_DATABASE_URL` имеет приоритет. После успешного переноса и перезапуска backend приложение будет читать PostgreSQL. Не добавляйте URL в код, README или чат. Используйте роль с правами на создание таблиц и запись; целевые таблицы `measurements`, `forecast_runs`, `forecast_points` должны быть пустыми. Скрипт не смешивает данные с существующими строками и не удаляет их.
 
 ```powershell
 .\.venv\Scripts\python.exe -m backend.migrate_sqlite_to_postgres
