@@ -22,7 +22,7 @@
 
 ## Зависимости и внешние источники
 
-Backend зависимости зафиксированы в `requirements.txt`: FastAPI, Uvicorn, SQLAlchemy, Psycopg 3, pandas, NumPy, scikit-learn, joblib, HTTPX, python-dotenv. Frontend зависимости находятся в `frontend/package.json`: Vue 3 и Vite. Перед финальной сдачей зависимости нужно зафиксировать точными версиями и сохранить lock-файл frontend после установки.
+Backend зависимости с точными версиями зафиксированы в `requirements.txt`: FastAPI, Uvicorn, SQLAlchemy, Psycopg 3, pandas, NumPy, scikit-learn, joblib, HTTPX, python-dotenv. Frontend зависимости находятся в `frontend/package.json`, а точные версии Vue 3, Vite и их транзитивных пакетов — в `frontend/package-lock.json`.
 
 Внешний погодный сервис: [Open-Meteo Single Runs API](https://open-meteo.com/en/docs/single-runs-api), модель ECMWF IFS HRES, доступ к конкретным архивным выпускам. Использование и лицензия погодных данных должны быть проверены перед публичным распространением результатов; сервис может иметь лимиты. Координаты обеих турбин предоставлены в ТЗ кейса через Google Maps. Другие внешние API не используются. Supabase, если выбран, предоставляет только PostgreSQL; работа приложения не зависит от его пользовательской авторизации.
 

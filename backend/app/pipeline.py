@@ -41,7 +41,7 @@ def import_csv(session: Session, path: Path, turbine_id: int) -> int:
             batch.append({
                 "turbine_id": turbine_id,
                 "source_id": int(row[SOURCE_COLUMNS[0]]),
-                "observed_at": datetime.fromisoformat(row[SOURCE_COLUMNS[1]]),
+                "observed_at": datetime.strptime(row[SOURCE_COLUMNS[1]], "%Y-%m-%d %H:%M:%S"),
                 "wind_speed_ms": float(row[SOURCE_COLUMNS[2]]),
                 "normalized_power": float(row[SOURCE_COLUMNS[3]]),
                 "temperature_c": float(row[SOURCE_COLUMNS[4]]),
