@@ -14,6 +14,8 @@ from backend.app.pipeline import SOURCE_COLUMNS
 
 class ApiTests(unittest.TestCase):
     def setUp(self):
+        self.env_patch = patch.dict("os.environ", {"API_WRITE_KEY": "", "APP_ENV": "development"})
+        self.env_patch.start()
         self.temp = tempfile.TemporaryDirectory()
         self.engine = create_engine(f"sqlite:///{(Path(self.temp.name) / 'api.sqlite3').as_posix()}",
                                     connect_args={"check_same_thread": False})
@@ -31,6 +33,7 @@ class ApiTests(unittest.TestCase):
         app.dependency_overrides.clear()
         self.engine.dispose()
         self.temp.cleanup()
+        self.env_patch.stop()
 
     def test_new_turbine_csv_upload_and_model_validation(self):
         turbine = self.client.post("/turbines", json={"name": "Турбина 03", "latitude": 43.7,
