@@ -91,13 +91,6 @@ def add_turbine(item: TurbineInput, session: Session = Depends(get_session)) -> 
             "longitude": turbine.longitude, "maps_url": turbine.maps_url}
 
 
-@app.get("/turbines")
-def turbines() -> list[dict]:
-    return [{"id": turbine_id, "name": f"Турбина {turbine_id:02d}",
-             "latitude": coordinates[0], "longitude": coordinates[1]}
-            for turbine_id, coordinates in COORDINATES.items()]
-
-
 @app.get("/measurements")
 def measurements(turbine_id: int = Query(ge=1), limit: int = Query(default=100, ge=1, le=1000),
                  offset: int = Query(default=0, ge=0), session: Session = Depends(get_session)) -> list[dict]:
