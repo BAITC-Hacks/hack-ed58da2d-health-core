@@ -23,11 +23,12 @@ class DatabaseBootstrapTests(unittest.TestCase):
 
             inspector = inspect(engine)
             self.assertEqual(set(inspector.get_table_names()),
-                             {"measurements", "forecast_runs", "forecast_points"})
+                             {"measurements", "forecast_runs", "forecast_points", "turbines", "model_revisions"})
             self.assertIn("ix_measurements_turbine_observed",
                           {item["name"] for item in inspector.get_indexes("measurements")})
             with engine.connect() as connection:
                 self.assertEqual(connection.scalar(text("SELECT count(*) FROM measurements")), 1)
+                self.assertEqual(connection.scalar(text("SELECT count(*) FROM turbines")), 2)
             engine.dispose()
 
 

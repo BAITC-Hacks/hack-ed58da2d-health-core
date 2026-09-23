@@ -3,7 +3,6 @@ import os
 
 import httpx
 
-COORDINATES = {1: (43.645150, 78.535604), 2: (43.643198, 78.538828)}
 KAZAKHSTAN_OFFSET = timezone(timedelta(hours=5))
 
 
@@ -17,8 +16,7 @@ def issue_and_weather_run(issue_date: date) -> tuple[datetime, datetime]:
     return issued_at, run_at
 
 
-def fetch_weather(turbine_id: int, run_at: datetime) -> dict[datetime, tuple[float, float]]:
-    latitude, longitude = COORDINATES[turbine_id]
+def fetch_weather(latitude: float, longitude: float, run_at: datetime) -> dict[datetime, tuple[float, float]]:
     params = {
         "latitude": latitude,
         "longitude": longitude,
