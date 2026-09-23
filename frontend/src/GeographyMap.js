@@ -4,15 +4,33 @@ import { request } from './model.js'
 const demoMapId = 'DEMO_MAP_ID'
 
 function loadGoogleMaps(key) {
-  if (window.google?.maps?.importLibrary) return Promise.resolve(window.google.maps)
+  if (typeof window.google?.maps?.importLibrary === 'function') return Promise.resolve(window.google.maps)
   if (window.__windSightMapsPromise) return window.__windSightMapsPromise
   window.__windSightMapsPromise = new Promise((resolve, reject) => {
+    const callbackName = '__windSightMapsReady'
     const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async`
+    const timeout = window.setTimeout(() => fail(new Error('Google Maps не ответила вовремя. Проверьте подключение и настройки API-ключа.')), 15000)
+    function finish() {
+      window.clearTimeout(timeout)
+      delete window[callbackName]
+    }
+    function fail(reason) {
+      finish()
+      script.remove()
+      reject(reason)
+    }
+    window[callbackName] = () => {
+      finish()
+      if (typeof window.google?.maps?.importLibrary === 'function') resolve(window.google.maps)
+      else reject(new Error('Google Maps загрузилась без необходимых библиотек. Проверьте Maps JavaScript API.'))
+    }
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async&callback=${callbackName}`
     script.async = true
-    script.onload = () => resolve(window.google?.maps)
-    script.onerror = () => reject(new Error('Не удалось загрузить Google Maps. Проверьте API-ключ и ограничения ключа.'))
+    script.onerror = () => fail(new Error('Не удалось загрузить Google Maps. Проверьте API-ключ и ограничения ключа.'))
     document.head.append(script)
+  }).catch(reason => {
+    window.__windSightMapsPromise = undefined
+    throw reason
   })
   return window.__windSightMapsPromise
 }

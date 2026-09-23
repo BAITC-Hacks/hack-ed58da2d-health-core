@@ -10,7 +10,11 @@ const assert = require('node:assert/strict')
  const turbines=[{id:1,name:'Турбина 01',latitude:43.64515,longitude:78.535604},{id:2,name:'Турбина 02',latitude:43.643198,longitude:78.538828}]
  const models=[{id:1,version:'TEST-FIXTURE',validation_mae:.03,training_rows:1000,turbine_ids:[1,2]}]
  let fail=false
- await page.route('https://maps.googleapis.com/**',route=>route.fulfill({status:200,contentType:'application/javascript',body:`window.google={maps:{MapTypeId:{TERRAIN:'terrain',ROADMAP:'roadmap',SATELLITE:'satellite'},LatLngBounds:class{extend(){}},Map:class{constructor(el,opts){this.element=el;this.options=opts}fitBounds(){}panTo(){}setZoom(){}},InfoWindow:class{setContent(){}open(){}},importLibrary:async name=>name==='maps'?{Map:window.google.maps.Map,InfoWindow:window.google.maps.InfoWindow,LatLngBounds:window.google.maps.LatLngBounds,MapTypeId:window.google.maps.MapTypeId}:{AdvancedMarkerElement:class{constructor(opts){Object.assign(this,opts)}addEventListener(){}},PinElement:class{constructor(){this.element=document.createElement('div')}}}}}`}))
+ await page.route('https://maps.googleapis.com/**',route=>{
+   const callback=new URL(route.request().url()).searchParams.get('callback')
+   assert.equal(callback,'__windSightMapsReady','Map loader waits for the Google Maps callback')
+   route.fulfill({status:200,contentType:'application/javascript',body:`window.google={maps:{MapTypeId:{TERRAIN:'terrain',ROADMAP:'roadmap',SATELLITE:'satellite'},LatLngBounds:class{extend(){}},Map:class{constructor(el,opts){el.dataset.mapReady='true';this.element=el;this.options=opts}fitBounds(){}panTo(){}setZoom(){}},InfoWindow:class{setContent(){}open(){}},importLibrary:async name=>name==='maps'?{Map:window.google.maps.Map,InfoWindow:window.google.maps.InfoWindow,LatLngBounds:window.google.maps.LatLngBounds,MapTypeId:window.google.maps.MapTypeId}:{AdvancedMarkerElement:class{constructor(opts){Object.assign(this,opts)}addEventListener(){}},PinElement:class{constructor(){this.element=document.createElement('div')}}}}};window[${JSON.stringify(callback)}]()`})
+ })
  await page.route('http://127.0.0.1:8000/**',route=>{
    const path=new URL(route.request().url()).pathname
    const payload=path==='/health'?{status:'ok'}:path==='/turbines'?turbines:path==='/models'?models:path.startsWith('/measurements/upload')?{rows:1,imported:1,skipped:0}:path==='/models/train'?{revision_id:1,model_version:'TEST-FIXTURE',validation_mae:.03,warning:''}:route.request().method()==='POST'?{id:7}:run
@@ -67,6 +71,8 @@ const assert = require('node:assert/strict')
  await page.getByRole('button',{name:'География ВЭС',exact:true}).click()
  await page.getByRole('heading',{name:'География ВЭС',exact:true,level:1}).waitFor()
  assert.equal(await page.locator('.geo-turbine').count(),2,'Both backend turbine coordinates are listed')
+ assert.equal(await page.locator('.geo-map').getAttribute('data-map-ready'),'true','Map initializes after the API callback')
+ assert.equal(await page.getByRole('alert').count(),0,'Geography does not report a loader error')
  assert.equal(await page.locator('.geo-map').evaluate(el=>el.style.height || getComputedStyle(el).minHeight),'560px','Terrain map has a usable desktop height')
  await page.screenshot({path:'tests/geography-desktop.png',fullPage:true})
  await page.setViewportSize({width:390,height:844})
