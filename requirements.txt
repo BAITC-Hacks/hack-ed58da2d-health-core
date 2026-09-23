@@ -3,7 +3,7 @@ uvicorn[standard]==0.53.0
 sqlalchemy==2.0.54
 psycopg[binary]==3.3.6
 pandas==2.3.3
-numpy==2.5.3
+numpy==2.4.6
 scikit-learn==1.9.1
 joblib==1.6.0
 httpx==0.28.1
